@@ -1,0 +1,195 @@
+const express = require("express");
+const RideShareRouter = express.Router();
+const RideShareDb = require("../cruds/rideshare");
+
+// ========================
+// Rideshare Trips
+// ========================
+
+// Create a new trip
+RideShareRouter.post("/trips", async (req, res) => {
+  try {
+    const tripData = req.body;
+    const result = await RideShareDb.createTrip(tripData);
+    res.json(result);
+  } catch (e) {
+    console.error(e);
+    res.sendStatus(500);
+  }
+});
+
+// Get all trips
+RideShareRouter.get("/trips", async (req, res) => {
+  try {
+    const trips = await RideShareDb.getAllTrips();
+    res.json(trips);
+  } catch (e) {
+    console.error(e);
+    res.sendStatus(500);
+  }
+});
+
+// Get trip by ID
+RideShareRouter.get("/trips/:rideshare_id", async (req, res) => {
+  try {
+    const { rideshare_id } = req.params;
+    const trip = await RideShareDb.getTripById(rideshare_id);
+    res.json(trip);
+  } catch (e) {
+    console.error(e);
+    res.sendStatus(500);
+  }
+});
+
+// Update trip status / seats
+RideShareRouter.put("/trips/:rideshare_id", async (req, res) => {
+  try {
+    const { rideshare_id } = req.params;
+    const updatedData = req.body;
+    const result = await RideShareDb.updateTrip(rideshare_id, updatedData);
+    res.json(result);
+  } catch (e) {
+    console.error(e);
+    res.sendStatus(500);
+  }
+});
+
+// Delete a trip
+RideShareRouter.delete("/trips/:rideshare_id", async (req, res) => {
+  try {
+    const { rideshare_id } = req.params;
+    const result = await RideShareDb.deleteTrip(rideshare_id);
+    res.json(result);
+  } catch (e) {
+    console.error(e);
+    res.sendStatus(500);
+  }
+});
+
+// ========================
+// Rideshare Midpoints
+// ========================
+
+// Add midpoints to a trip
+RideShareRouter.post("/midpoints/:rideshare_id", async (req, res) => {
+  try {
+    const { rideshare_id } = req.params;
+    const midpoints = req.body.midpoints; // [{lat, lng, sequence}]
+    const result = await RideShareDb.addMidpoints(rideshare_id, midpoints);
+    res.json(result);
+  } catch (e) {
+    console.error(e);
+    res.sendStatus(500);
+  }
+});
+
+// Get midpoints of a trip
+RideShareRouter.get("/midpoints/:rideshare_id", async (req, res) => {
+  try {
+    const { rideshare_id } = req.params;
+    const midpoints = await RideShareDb.getMidpoints(rideshare_id);
+    res.json(midpoints);
+  } catch (e) {
+    console.error(e);
+    res.sendStatus(500);
+  }
+});
+
+// ========================
+// Rideshare Requests (Passengers)
+// ========================
+
+// Passenger joins a trip
+RideShareRouter.post("/requests", async (req, res) => {
+  try {
+    const requestData = req.body;
+    const result = await RideShareDb.createRequest(requestData);
+    res.json(result);
+  } catch (e) {
+    console.error(e);
+    res.sendStatus(500);
+  }
+});
+
+// Get all requests for a trip
+RideShareRouter.get("/requests/trip/:rideshare_id", async (req, res) => {
+  try {
+    const { rideshare_id } = req.params;
+    const requests = await RideShareDb.getRequestsByTrip(rideshare_id);
+    res.json(requests);
+  } catch (e) {
+    console.error(e);
+    res.sendStatus(500);
+  }
+});
+
+// Update request status / fare / seat
+RideShareRouter.put("/requests/:request_id", async (req, res) => {
+  try {
+    const { request_id } = req.params;
+    const updatedData = req.body;
+    const result = await RideShareDb.updateRequest(request_id, updatedData);
+    res.json(result);
+  } catch (e) {
+    console.error(e);
+    res.sendStatus(500);
+  }
+});
+
+// ========================
+// Negotiation History
+// ========================
+
+// Add negotiation entry
+RideShareRouter.post("/negotiations", async (req, res) => {
+  try {
+    const negotiationData = req.body;
+    const result = await RideShareDb.addNegotiation(negotiationData);
+    res.json(result);
+  } catch (e) {
+    console.error(e);
+    res.sendStatus(500);
+  }
+});
+
+// Get negotiation history for request
+RideShareRouter.get("/negotiations/:request_id", async (req, res) => {
+  try {
+    const { request_id } = req.params;
+    const history = await RideShareDb.getNegotiationHistory(request_id);
+    res.json(history);
+  } catch (e) {
+    console.error(e);
+    res.sendStatus(500);
+  }
+});
+
+// ========================
+// Fare Updates
+// ========================
+
+// Add fare update entry
+RideShareRouter.post("/fare_updates", async (req, res) => {
+  try {
+    const fareData = req.body;
+    const result = await RideShareDb.addFareUpdate(fareData);
+    res.json(result);
+  } catch (e) {
+    console.error(e);
+    res.sendStatus(500);
+  }
+});
+
+// Get fare updates for a trip
+RideShareRouter.get("/fare_updates/:rideshare_id", async (req, res) => {
+  try {
+    const { rideshare_id } = req.params;
+    const updates = await RideShareDb.getFareUpdates(rideshare_id);
+    res.json(updates);
+  } catch (e) {
+    console.error(e);
+    res.sendStatus(500);
+  }
+});
+
+module.exports = RideShareRouter;

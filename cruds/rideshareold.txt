@@ -1,0 +1,240 @@
+require("dotenv").config();
+const pool = require("./poolfile");
+
+let crudsObj = {};
+
+/* ========================
+   Rideshare Trips
+======================== */
+crudsObj.createTrip = (tripData) => {
+  return new Promise((resolve, reject) => {
+    const {
+      driver_id,
+      origin_lat,
+      origin_lng,
+      destination_lat,
+      destination_lng,
+      total_seats,
+      available_seats,
+      status = "Created Shared Ride Request"
+    } = tripData;
+
+    pool.query(
+      `INSERT INTO rideshare_trips (
+          driver_id, origin_lat, origin_lng, destination_lat, destination_lng,
+          total_seats, available_seats, status
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [driver_id, origin_lat, origin_lng, destination_lat, destination_lng, total_seats, available_seats, status],
+      (err, result) => {
+        if (err) return reject(err);
+        return resolve({ status: 200, message: "Trip created", rideshare_id: result.insertId });
+      }
+    );
+  });
+};
+
+
+crudsObj.getAllTrips = () => {
+  return new Promise((resolve, reject) => {
+    pool.query("SELECT * FROM rideshare_trips", (err, results) => {
+      if (err) return reject(err);
+      resolve(results);
+    });
+  });
+};
+
+crudsObj.getTripById = (rideshare_id) => {
+  return new Promise((resolve, reject) => {
+    pool.query(
+      "SELECT * FROM rideshare_trips WHERE rideshare_id = ?",
+      [rideshare_id],
+      (err, results) => {
+        if (err) return reject(err);
+        resolve(results[0]);
+      }
+    );
+  });
+};
+
+crudsObj.updateTrip = (rideshare_id, updatedData) => {
+  return new Promise((resolve, reject) => {
+    const { available_seats, status, fare_estimate } = updatedData;
+    pool.query(
+      `UPDATE rideshare_trips 
+       SET available_seats = ?, status = ?, fare_estimate = ?
+       WHERE rideshare_id = ?`,
+      [available_seats, status, fare_estimate, rideshare_id],
+      (err, result) => {
+        if (err) return reject(err);
+        resolve({ status: 200, message: "Trip updated" });
+      }
+    );
+  });
+};
+
+crudsObj.deleteTrip = (rideshare_id) => {
+  return new Promise((resolve, reject) => {
+    pool.query(
+      "DELETE FROM rideshare_trips WHERE rideshare_id = ?",
+      [rideshare_id],
+      (err, result) => {
+        if (err) return reject(err);
+        resolve({ status: 200, message: "Trip deleted" });
+      }
+    );
+  });
+};
+
+/* ========================
+   Rideshare Midpoints
+======================== */
+crudsObj.addMidpoints = (rideshare_id, midpoints) => {
+  return new Promise((resolve, reject) => {
+    const values = midpoints.map((m, i) => [rideshare_id, m.lat, m.lng, i + 1]);
+    pool.query(
+      `INSERT INTO rideshare_midpoints (rideshare_id, lat, lng, sequence) VALUES ?`,
+      [values],
+      (err, result) => {
+        if (err) return reject(err);
+        resolve({ status: 200, message: "Midpoints added" });
+      }
+    );
+  });
+};
+
+crudsObj.getMidpoints = (rideshare_id) => {
+  return new Promise((resolve, reject) => {
+    pool.query(
+      "SELECT * FROM rideshare_midpoints WHERE rideshare_id = ? ORDER BY sequence ASC",
+      [rideshare_id],
+      (err, results) => {
+        if (err) return reject(err);
+        resolve(results);
+      }
+    );
+  });
+};
+
+/* ========================
+   Rideshare Requests (Passengers)
+======================== */
+crudsObj.createRequest = (requestData) => {
+  return new Promise((resolve, reject) => {
+    const {
+      rideshare_id,
+      passenger_id,
+      pickup_lat,
+      pickup_lng,
+      dropoff_lat,
+      dropoff_lng,
+      fare_offer,
+      status = "Join Shared Ride Request"
+    } = requestData;
+
+    pool.query(
+      `INSERT INTO rideshare_requests (
+        rideshare_id, passenger_id, pickup_lat, pickup_lng, dropoff_lat, dropoff_lng, fare_offer, status
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [rideshare_id, passenger_id, pickup_lat, pickup_lng, dropoff_lat, dropoff_lng, fare_offer, status],
+      (err, result) => {
+        if (err) return reject(err);
+        resolve({ status: 200, message: "Request created", request_id: result.insertId });
+      }
+    );
+  });
+};
+
+crudsObj.getRequestsByTrip = (rideshare_id) => {
+  return new Promise((resolve, reject) => {
+    pool.query(
+      "SELECT * FROM rideshare_requests WHERE rideshare_id = ?",
+      [rideshare_id],
+      (err, results) => {
+        if (err) return reject(err);
+        resolve(results);
+      }
+    );
+  });
+};
+
+crudsObj.updateRequest = (request_id, updatedData) => {
+  return new Promise((resolve, reject) => {
+    const { status, fare_offer } = updatedData;
+    pool.query(
+      `UPDATE rideshare_requests
+       SET status = ?, fare_offer = ?
+       WHERE request_id = ?`,
+      [status, fare_offer, request_id],
+      (err, result) => {
+        if (err) return reject(err);
+        resolve({ status: 200, message: "Request updated" });
+      }
+    );
+  });
+};
+
+/* ========================
+   Rideshare Negotiations
+======================== */
+crudsObj.addNegotiation = (negotiationData) => {
+  return new Promise((resolve, reject) => {
+    const { request_id, driver_id, passenger_id, offer_amount, status } = negotiationData;
+    pool.query(
+      `INSERT INTO rideshare_negotiation_history
+        (request_id, driver_id, passenger_id, offer_amount, status)
+       VALUES (?, ?, ?, ?, ?)`,
+      [request_id, driver_id, passenger_id, offer_amount, status],
+      (err, result) => {
+        if (err) return reject(err);
+        resolve({ status: 200, message: "Negotiation logged" });
+      }
+    );
+  });
+};
+
+crudsObj.getNegotiationHistory = (request_id) => {
+  return new Promise((resolve, reject) => {
+    pool.query(
+      "SELECT * FROM rideshare_negotiation_history WHERE request_id = ? ORDER BY created_at ASC",
+      [request_id],
+      (err, results) => {
+        if (err) return reject(err);
+        resolve(results);
+      }
+    );
+  });
+};
+
+/* ========================
+   Rideshare Fare Updates (Optional Audit)
+======================== */
+crudsObj.addFareUpdate = (fareData) => {
+  return new Promise((resolve, reject) => {
+    const { rideshare_id, passenger_id, old_fare, new_fare } = fareData;
+    pool.query(
+      `INSERT INTO rideshare_fare_updates
+       (rideshare_id, passenger_id, old_fare, new_fare)
+       VALUES (?, ?, ?, ?)`,
+      [rideshare_id, passenger_id, old_fare, new_fare],
+      (err, result) => {
+        if (err) return reject(err);
+        resolve({ status: 200, message: "Fare update logged" });
+      }
+    );
+  });
+};
+
+crudsObj.getFareUpdates = (rideshare_id) => {
+  return new Promise((resolve, reject) => {
+    pool.query(
+      "SELECT * FROM rideshare_fare_updates WHERE rideshare_id = ?",
+      [rideshare_id],
+      (err, results) => {
+        if (err) return reject(err);
+        resolve(results);
+      }
+    );
+  });
+};
+
+module.exports = crudsObj;
