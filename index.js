@@ -189,7 +189,7 @@ app.get("/check_payment/:referenceNumber", async (req, res) => {
 });
 
 app.get("/", (req, res) => {
-  res.send("Kwaunoda");
+  res.send("Kwaunoda - Ride Share");
 });
 
 app.post("/driver/login", async (req, res) => {
