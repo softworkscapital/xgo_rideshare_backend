@@ -1,1166 +1,317 @@
-require("dotenv").config();
-const pool = require("./poolfile");
+require('dotenv').config(); 
+const pool = require('./poolfile');
 
-let crudsObj = {};
-crudsObj.postStatistic = (application_statistic_id) => {
-  let datefor = "";
-  let kms_billed = "";
-  let customers_count = "";
-  let drivers_count = "";
-  let trips_count = "";
-  let trips_per_customer = "";
-  let billed_amount_usd = "";
-  let average_trip_rate_usd = "";
-  let mode_rate_usd = "";
-  let average_billed = "";
-  let new_customer_count = "";
-  let new_drivers_count = "";
-  let complaints_count = "";
-  let total_rating_count = "";
-  let ave_rating_count = "";
-  let driver_open_balance = "";
-  let driver_top_up = "";
-  let driver_billed_charges = "";
-  let driver_withdrawals = "";
-  let driver_escrow = "";
-  let driver_promo = "";
-  let driver_deductions = "";
-  let driver_additions = "";
-  let driver_close_balance = "";
-  let customer_open_balance = "";
-  let customer_to_up = "";
-  let customer_billed_charges = "";
-  let customer_withdrawals = "";
-  let customer_escrow = "";
-  let customer_promo = "";
-  let customer_deduction = "";
-  let customer_additions = "";
-  let customer_close_balance = "";
-  let company_open_balance = "";
-  let company_income_from_charges = "";
-  let company_promotions = "";
-  let company_withdraws_out = "";
-  let company_close_balance = "";
+const crudsObj = {}; // <-- This is critical
 
-  return new Promise((resolve, reject) => {
-    // Creating current day and populating datefor
-    const currentDate = new Date();
-    currentDate.setHours(currentDate.getHours() + 2); // Add 2 hours
-    const formattedDate = currentDate
-      .toISOString()
-      .slice(0, 19)
-      .replace("T", " "); // Format the date
-    console.log(formattedDate);
-    datefor = formattedDate; // Assign to datefor
-
-    // Calculating distance billed for the day
-    pool.query(
-      "SELECT SUM(distance) AS total_distance FROM trip",
-      (err, results) => {
-        if (err) {
-          return reject(err);
-        }
-        console.log("Total Distance:", results); // Log the result
-        kms_billed = results[0].total_distance || 0; // Default to 0 if no distance is found
-
-        // Customer counts
-        pool.query(
-          "SELECT COUNT(customerid) AS total_customers FROM customer_details",
-          (err, results) => {
-            if (err) {
-              return reject(err);
-            }
-            console.log("Total Customers:", results[0].total_customers);
-            customers_count = results[0].total_customers;
-
-            // Driver counts
-            pool.query(
-              "SELECT COUNT(driver_id) AS total_drivers FROM driver_details",
-              (err, results) => {
-                if (err) {
-                  return reject(err);
-                }
-                console.log("Total Drivers:", results[0].total_drivers);
-                drivers_count = results[0].total_drivers;
-
-                // Trip counts
-                pool.query(
-                  "SELECT COUNT(trip_id) AS total_trips FROM trip",
-                  (err, results) => {
-                    if (err) {
-                      return reject(err);
-                    }
-                    console.log("Total Trips:", results[0].total_trips);
-                    trips_count = results[0].total_trips;
-
-                    // Trips per customer
-                    trips_per_customer =
-                      customers_count > 0 ? trips_count / customers_count : 0;
-                    console.log("Trips per Customer:", trips_per_customer);
-
-                    // // Average rating
-                    pool.query(
-                      "SELECT AVG(customer_stars + driver_stars) AS total_average FROM trip",
-                      (err, results) => {
-                        if (err) {
-                          return reject(err);
-                        }
-                        console.log(
-                          "Average Rating:",
-                          results[0].total_average
-                        );
-                        average_billed = results[0].total_average || 0;
-
-                        // Average trip rate
-                        pool.query(
-                          "SELECT AVG(accepted_cost) AS total_average FROM trip",
-                          (err, results) => {
-                            if (err) {
-                              return reject(err);
-                            }
-                            console.log(
-                              "Total Average Accepted Cost:",
-                              results[0].total_average
-                            );
-                            average_trip_rate_usd =
-                              results[0].total_average || 0;
-
-                            // Mode of accepted cost
-                            // pool.query("SELECT MODE(accepted_cost) FROM trip GROUP BY accepted_cost ORDER BY COUNT(*) DESC LIMIT 1", (err, results) => {
-                            //     if (err) {
-                            //         return reject(err);
-                            //     }
-                            //     mode_rate_usd = results[0] ? results[0].accepted_cost : 0;
-
-                            // New customer count
-                            pool.query(
-                              "SELECT COUNT(customerid) AS total_count FROM customer_details",
-                              (err, results) => {
-                                if (err) {
-                                  return reject(err);
-                                }
-                                new_customer_count =
-                                  results[0].total_count || 0;
-
-                                // New drivers count
-                                pool.query(
-                                  "SELECT COUNT(driver_id) AS total_count FROM driver_details",
-                                  (err, results) => {
-                                    if (err) {
-                                      return reject(err);
-                                    }
-                                    new_drivers_count =
-                                      results[0].total_count || 0;
-
-                                    // Complaints count
-                                    pool.query(
-                                      "SELECT COUNT(conversation_support_id) AS total_count FROM conversation_support",
-                                      (err, results) => {
-                                        if (err) {
-                                          return reject(err);
-                                        }
-                                        complaints_count =
-                                          results[0].total_count || 0;
-
-                                        // Total rating count
-                                        pool.query(
-                                          "SELECT SUM(customer_stars + driver_stars) AS total_sum FROM trip",
-                                          (err, results) => {
-                                            if (err) {
-                                              return reject(err);
-                                            }
-                                            total_rating_count =
-                                              results[0].total_sum || 0;
-
-                                            const date_today = new Date()
-                                              .toISOString()
-                                              .slice(0, 10); // Format: YYYY-MM-DD
-                                            const date_one_day_ago = new Date();
-                                            date_one_day_ago.setDate(
-                                              date_one_day_ago.getDate() - 1
-                                            );
-                                            const date_two_days_ago =
-                                              new Date();
-                                            date_two_days_ago.setDate(
-                                              date_two_days_ago.getDate() - 2
-                                            );
-                                            const date_three_days_ago =
-                                              new Date();
-                                            date_three_days_ago.setDate(
-                                              date_three_days_ago.getDate() - 3
-                                            );
-                                            const date_seven_days_ago =
-                                              new Date();
-                                            date_seven_days_ago.setDate(
-                                              date_seven_days_ago.getDate() - 7
-                                            );
-                                            const date_fourteen_days_ago =
-                                              new Date();
-                                            date_fourteen_days_ago.setDate(
-                                              date_fourteen_days_ago.getDate() -
-                                                14
-                                            );
-                                            const date_thirty_days_ago =
-                                              new Date();
-                                            date_thirty_days_ago.setDate(
-                                              date_thirty_days_ago.getDate() -
-                                                30
-                                            );
-
-                                            //   let signed_up_today, users_logged_in_today, users_logged_in_one_day_ago;
-                                            //   let users_logged_in_two_days_ago, users_logged_in_three_days_ago;
-                                            //   let users_logged_in_seven_days_ago, users_logged_in_fourteen_days_ago;
-                                            //   let users_logged_in_thirty_days_ago, average;
-
-                                            // New customers today count
-                                            pool.query(
-                                              "SELECT COUNT(signed_up_on) AS signed_up_today FROM users WHERE signed_up_on = ?",
-                                              [date_today],
-                                              (err, results) => {
-                                                if (err) {
-                                                  return reject(err);
-                                                }
-                                                const signed_up_today =
-                                                  results[0].signed_up_today ||
-                                                  0;
-
-                                                // New customers logged in today
-                                                pool.query(
-                                                  "SELECT COUNT(last_logged_in) AS users_logged_in_today FROM users WHERE last_logged_in >= ? AND last_logged_in < ?",
-                                                  [
-                                                    date_today,
-                                                    new Date()
-                                                      .toISOString()
-                                                      .slice(0, 10) +
-                                                      " 23:59:59",
-                                                  ],
-                                                  (err, results) => {
-                                                    if (err) {
-                                                      return reject(err);
-                                                    }
-                                                    const users_logged_in_today =
-                                                      results[0]
-                                                        .users_logged_in_today ||
-                                                      0;
-
-                                                    // Last logged in one day ago
-                                                    pool.query(
-                                                      "SELECT COUNT(last_logged_in) AS users_logged_in_one_day_ago FROM users WHERE last_logged_in >= ? AND last_logged_in < ?",
-                                                      [
-                                                        date_one_day_ago
-                                                          .toISOString()
-                                                          .slice(0, 10),
-                                                        date_today,
-                                                      ],
-                                                      (err, results) => {
-                                                        if (err) {
-                                                          return reject(err);
-                                                        }
-                                                        const users_logged_in_one_day_ago =
-                                                          results[0]
-                                                            .users_logged_in_one_day_ago ||
-                                                          0;
-
-                                                        // Last logged in two days ago
-                                                        pool.query(
-                                                          "SELECT COUNT(last_logged_in) AS users_logged_in_two_days_ago FROM users WHERE last_logged_in >= ? AND last_logged_in < ?",
-                                                          [
-                                                            date_two_days_ago
-                                                              .toISOString()
-                                                              .slice(0, 10),
-                                                            date_one_day_ago
-                                                              .toISOString()
-                                                              .slice(0, 10),
-                                                          ],
-                                                          (err, results) => {
-                                                            if (err) {
-                                                              return reject(
-                                                                err
-                                                              );
-                                                            }
-                                                            const users_logged_in_two_days_ago =
-                                                              results[0]
-                                                                .users_logged_in_two_days_ago ||
-                                                              0;
-
-                                                            // Last logged in three days ago
-                                                            pool.query(
-                                                              "SELECT COUNT(last_logged_in) AS users_logged_in_three_days_ago FROM users WHERE last_logged_in >= ? AND last_logged_in < ?",
-                                                              [
-                                                                date_three_days_ago
-                                                                  .toISOString()
-                                                                  .slice(0, 10),
-                                                                date_two_days_ago
-                                                                  .toISOString()
-                                                                  .slice(0, 10),
-                                                              ],
-                                                              (
-                                                                err,
-                                                                results
-                                                              ) => {
-                                                                if (err) {
-                                                                  return reject(
-                                                                    err
-                                                                  );
-                                                                }
-                                                                const users_logged_in_three_days_ago =
-                                                                  results[0]
-                                                                    .users_logged_in_three_days_ago ||
-                                                                  0;
-
-                                                                // Last logged in seven days ago
-                                                                pool.query(
-                                                                  "SELECT COUNT(last_logged_in) AS users_logged_in_seven_days_ago FROM users WHERE last_logged_in >= ? AND last_logged_in < ?",
-                                                                  [
-                                                                    date_seven_days_ago
-                                                                      .toISOString()
-                                                                      .slice(
-                                                                        0,
-                                                                        10
-                                                                      ),
-                                                                    date_three_days_ago
-                                                                      .toISOString()
-                                                                      .slice(
-                                                                        0,
-                                                                        10
-                                                                      ),
-                                                                  ],
-                                                                  (
-                                                                    err,
-                                                                    results
-                                                                  ) => {
-                                                                    if (err) {
-                                                                      return reject(
-                                                                        err
-                                                                      );
-                                                                    }
-                                                                    const users_logged_in_seven_days_ago =
-                                                                      results[0]
-                                                                        .users_logged_in_seven_days_ago ||
-                                                                      0;
-
-                                                                    // Last logged in fourteen days ago
-                                                                    pool.query(
-                                                                      "SELECT COUNT(last_logged_in) AS users_logged_in_fourteen_days_ago FROM users WHERE last_logged_in >= ? AND last_logged_in < ?",
-                                                                      [
-                                                                        date_fourteen_days_ago
-                                                                          .toISOString()
-                                                                          .slice(
-                                                                            0,
-                                                                            10
-                                                                          ),
-                                                                        date_seven_days_ago
-                                                                          .toISOString()
-                                                                          .slice(
-                                                                            0,
-                                                                            10
-                                                                          ),
-                                                                      ],
-                                                                      (
-                                                                        err,
-                                                                        results
-                                                                      ) => {
-                                                                        if (
-                                                                          err
-                                                                        ) {
-                                                                          return reject(
-                                                                            err
-                                                                          );
-                                                                        }
-                                                                        const users_logged_in_fourteen_days_ago =
-                                                                          results[0]
-                                                                            .users_logged_in_fourteen_days_ago ||
-                                                                          0;
-
-                                                                        // Last logged in thirty days ago
-                                                                        pool.query(
-                                                                          "SELECT COUNT(last_logged_in) AS users_logged_in_thirty_days_ago FROM users WHERE last_logged_in >= ? AND last_logged_in < ?",
-                                                                          [
-                                                                            date_thirty_days_ago
-                                                                              .toISOString()
-                                                                              .slice(
-                                                                                0,
-                                                                                10
-                                                                              ),
-                                                                            date_fourteen_days_ago
-                                                                              .toISOString()
-                                                                              .slice(
-                                                                                0,
-                                                                                10
-                                                                              ),
-                                                                          ],
-                                                                          (
-                                                                            err,
-                                                                            results
-                                                                          ) => {
-                                                                            if (
-                                                                              err
-                                                                            ) {
-                                                                              return reject(
-                                                                                err
-                                                                              );
-                                                                            }
-                                                                            const users_logged_in_thirty_days_ago =
-                                                                              results[0]
-                                                                                .users_logged_in_thirty_days_ago ||
-                                                                              0;
-
-                                                                            // Average last activity
-                                                                            const last_activity_date_time =
-                                                                              "0000-00-00 00:00:00"; // You might want to change this logic
-                                                                            pool.query(
-                                                                              "SELECT AVG(TIMESTAMPDIFF(DAY, last_logged_in, NOW())) AS average_last_activity FROM users WHERE last_logged_in >= ?",
-                                                                              [
-                                                                                date_thirty_days_ago
-                                                                                  .toISOString()
-                                                                                  .slice(
-                                                                                    0,
-                                                                                    10
-                                                                                  ),
-                                                                              ],
-                                                                              (
-                                                                                err,
-                                                                                results
-                                                                              ) => {
-                                                                                if (
-                                                                                  err
-                                                                                ) {
-                                                                                  return reject(
-                                                                                    err
-                                                                                  );
-                                                                                }
-                                                                                const average_engagement_time =
-                                                                                  results[0]
-                                                                                    .average_last_activity ||
-                                                                                  0;
-
-                                                                                console.log(
-                                                                                  {
-                                                                                    signed_up_today,
-                                                                                    users_logged_in_today,
-                                                                                    users_logged_in_one_day_ago,
-                                                                                    users_logged_in_two_days_ago,
-                                                                                    users_logged_in_three_days_ago,
-                                                                                    users_logged_in_seven_days_ago,
-                                                                                    users_logged_in_fourteen_days_ago,
-                                                                                    users_logged_in_thirty_days_ago,
-                                                                                    average_engagement_time:
-                                                                                      average_engagement_time,
-                                                                                  }
-                                                                                );
-
-                                                                                const queries =
-                                                                                  [
-                                                                                    "SELECT main_wallet_total_balance FROM top_up WHERE folio = 'MW' ORDER BY top_up_id DESC LIMIT 1",
-                                                                                    "SELECT main_wallet_balance FROM top_up WHERE folio = 'MW' ORDER BY top_up_id DESC LIMIT 1",
-                                                                                    "SELECT revenue_wallet_total_balance FROM top_up WHERE folio = 'RW' ORDER BY top_up_id DESC LIMIT 1",
-                                                                                    "SELECT vendor_wallet_total_balance FROM top_up WHERE folio = 'VW' ORDER BY top_up_id DESC LIMIT 1",
-                                                                                    "SELECT escrow_total_balance FROM top_up WHERE folio = 'EW' ORDER BY top_up_id DESC LIMIT 1",
-                                                                                  ];
-
-                                                                                pool.query(
-                                                                                  "SELECT user_wallet_total_balance FROM top_up WHERE folio = 'UW' ORDER BY top_up_id DESC LIMIT 1",
-                                                                                  (
-                                                                                    err,
-                                                                                    results
-                                                                                  ) => {
-                                                                                    if (
-                                                                                      err
-                                                                                    ) {
-                                                                                      return reject(
-                                                                                        err
-                                                                                      );
-                                                                                    }
-                                                                                    user_wallet_total_balance =
-                                                                                      results[0]
-                                                                                        .user_wallet_total_balance ||
-                                                                                      0;
-
-                                                                                    pool.query(
-                                                                                      "SELECT user_wallet_total_balance FROM top_up WHERE folio = 'UW' ORDER BY top_up_id DESC LIMIT 1",
-                                                                                      (
-                                                                                        err,
-                                                                                        result
-                                                                                      ) => {
-                                                                                        if (
-                                                                                          err
-                                                                                        ) {
-                                                                                          console.error(
-                                                                                            "Error executing user_wallet_total_balance query:",
-                                                                                            err
-                                                                                          );
-                                                                                          results.user_wallet_total_balance = 0; // Default to 0 in case of error
-                                                                                        } else {
-                                                                                          user_wallet_total_balance =
-                                                                                            result[0]
-                                                                                              .user_wallet_total_balance ||
-                                                                                            0;
-                                                                                        }
-
-                                                                                        pool.query(
-                                                                                          "SELECT main_wallet_total_balance FROM top_up WHERE folio = 'MW' ORDER BY top_up_id DESC LIMIT 1",
-                                                                                          (
-                                                                                            err,
-                                                                                            result
-                                                                                          ) => {
-                                                                                            if (
-                                                                                              err
-                                                                                            ) {
-                                                                                              console.error(
-                                                                                                "Error executing main_wallet_total_balance query:",
-                                                                                                err
-                                                                                              );
-                                                                                              main_wallet_total_balance = 0;
-                                                                                            } else {
-                                                                                              main_wallet_total_balance =
-                                                                                                result[0]
-                                                                                                  ? result[0]
-                                                                                                      .main_wallet_total_balance
-                                                                                                  : 0;
-                                                                                            }
-
-                                                                                            pool.query(
-                                                                                              "SELECT revenue_wallet_total_balance FROM top_up WHERE folio = 'RW' ORDER BY top_up_id DESC LIMIT 1",
-                                                                                              (
-                                                                                                err,
-                                                                                                result
-                                                                                              ) => {
-                                                                                                if (
-                                                                                                  err
-                                                                                                ) {
-                                                                                                  console.error(
-                                                                                                    "Error executing revenue_wallet_total_balance query:",
-                                                                                                    err
-                                                                                                  );
-                                                                                                  revenue_wallet_total_balance = 0;
-                                                                                                } else {
-                                                                                                  revenue_wallet_total_balance =
-                                                                                                    result[0]
-                                                                                                      ? result[0]
-                                                                                                          .revenue_wallet_total_balance
-                                                                                                      : 0;
-                                                                                                }
-
-                                                                                                pool.query(
-                                                                                                  "SELECT vendor_wallet_total_balance FROM top_up WHERE folio = 'VW' ORDER BY top_up_id DESC LIMIT 1",
-                                                                                                  (
-                                                                                                    err,
-                                                                                                    result
-                                                                                                  ) => {
-                                                                                                    if (
-                                                                                                      err
-                                                                                                    ) {
-                                                                                                      console.error(
-                                                                                                        "Error executing vendor_wallet_total_balance query:",
-                                                                                                        err
-                                                                                                      );
-                                                                                                      vendor_wallet_total_balance = 0;
-                                                                                                    } else {
-                                                                                                      vendor_wallet_total_balance =
-                                                                                                        result[0]
-                                                                                                          ? result[0]
-                                                                                                              .vendor_wallet_total_balance
-                                                                                                          : 0;
-                                                                                                    }
-
-                                                                                                    pool.query(
-                                                                                                      "SELECT escrow_total_balance FROM top_up WHERE folio = 'EW' ORDER BY top_up_id DESC LIMIT 1",
-                                                                                                      (
-                                                                                                        err,
-                                                                                                        result
-                                                                                                      ) => {
-                                                                                                        if (
-                                                                                                          err
-                                                                                                        ) {
-                                                                                                          console.error(
-                                                                                                            "Error executing escrow_total_balance query:",
-                                                                                                            err
-                                                                                                          );
-                                                                                                          escrow_total_balance = 0;
-                                                                                                        } else {
-                                                                                                          escrow_total_balance =
-                                                                                                            result[0]
-                                                                                                              ? result[0]
-                                                                                                                  .escrow_total_balance
-                                                                                                              : 0;
-                                                                                                        }
-
-                                                                                                        // Average rating count
-                                                                                                        pool.query(
-                                                                                                          "SELECT  AVG(customer_stars + driver_stars) AS average_rating FROM trip",
-                                                                                                          (
-                                                                                                            err,
-                                                                                                            results
-                                                                                                          ) => {
-                                                                                                            if (
-                                                                                                              err
-                                                                                                            ) {
-                                                                                                              return reject(
-                                                                                                                err
-                                                                                                              );
-                                                                                                            }
-                                                                                                            ave_rating_count =
-                                                                                                              results[0]
-                                                                                                                .average_rating ||
-                                                                                                              0;
-
-                                                                                                            // getting total commisions today
-                                                                                                            pool.query(
-                                                                                                              `
-                                                    SELECT 
-                                                      (SELECT SUM(user_wallet_credit) FROM top_up WHERE trxn_code='CM') AS sum_commission_uw,
-                                                      (SELECT SUM(vendor_wallet_credit) FROM top_up WHERE trxn_code='CM') AS sum_commission_vw,
-
-                                                      (SELECT SUM(user_wallet_debit) FROM top_up WHERE trxn_code='PM') AS sum_promotion_uw,
-                                                      (SELECT SUM(vendor_wallet_debit) FROM top_up WHERE trxn_code='PM') AS sum_promotion_vw,
-
-                                                      (SELECT SUM(user_wallet_debit) FROM top_up WHERE trxn_code='TU') AS sum_top_up_uw,
-                                                      (SELECT SUM(vendor_wallet_debit) FROM top_up WHERE trxn_code='TU') AS sum_top_up_vw,
-
-                                                      (SELECT SUM(user_wallet_credit) FROM top_up WHERE trxn_code='WD') AS sum_withdrawal_uw,
-                                                      (SELECT SUM(vendor_wallet_credit) FROM top_up WHERE trxn_code='WD') AS sum_withdrawal_vw,
-
-                                                      (SELECT SUM(user_wallet_credit) FROM top_up WHERE trxn_code='MP') AS sum_mischief_penalty_uw, 
-                                                      (SELECT SUM(vendor_wallet_credit) FROM top_up WHERE trxn_code='MP') AS sum_mischief_penalty_vw 
-
-
-                                                  `,
-                                                                                                              (
-                                                                                                                err,
-                                                                                                                results
-                                                                                                              ) => {
-                                                                                                                if (
-                                                                                                                  err
-                                                                                                                ) {
-                                                                                                                  return reject(
-                                                                                                                    err
-                                                                                                                  );
-                                                                                                                }
-
-                                                                                                                sum_commission_uw =
-                                                                                                                  results[0]
-                                                                                                                    .sum_commission_uw ||
-                                                                                                                  0;
-                                                                                                                sum_commission_vw =
-                                                                                                                  results[0]
-                                                                                                                    .sum_commission_vw ||
-                                                                                                                  0;
-                                                                                                                sum_promotion_uw =
-                                                                                                                  results[0]
-                                                                                                                    .sum_promotion_uw ||
-                                                                                                                  0;
-                                                                                                                sum_promotion_vw =
-                                                                                                                  results[0]
-                                                                                                                    .sum_promotion_vw ||
-                                                                                                                  0;
-                                                                                                                sum_top_up_uw =
-                                                                                                                  results[0]
-                                                                                                                    .sum_top_up_uw ||
-                                                                                                                  0;
-                                                                                                                (sum_top_up_vw =
-                                                                                                                  results[0]
-                                                                                                                    .sum_top_up_vw ||
-                                                                                                                  0),
-                                                                                                                  (sum_withdrawal_uw =
-                                                                                                                    results[0]
-                                                                                                                      .sum_withdrawal_uw ||
-                                                                                                                    0);
-                                                                                                                sum_withdrawal_vw =
-                                                                                                                  results[0]
-                                                                                                                    .sum_withdrawal_vw ||
-                                                                                                                  0;
-                                                                                                                sum_mischief_penalty_uw =
-                                                                                                                  results[0]
-                                                                                                                    .sum_mischief_penalty_uw ||
-                                                                                                                  0;
-                                                                                                                sum_mischief_penalty_vw =
-                                                                                                                  results[0]
-                                                                                                                    .sum_mischief_penalty_vw ||
-                                                                                                                  0;
-
-                                                                                                                // Driver open balance
-
-                                                                                                                // pool.query(`
-                                                                                                                // SELECT SUM(latest_balances.balance) AS total_user_balances
-                                                                                                                // FROM (
-                                                                                                                // SELECT user_id, balance
-                                                                                                                // FROM top_up
-                                                                                                                // WHERE client_profile_id IN (SELECT user_id FROM users)
-                                                                                                                // ORDER BY top_up_id DESC
-                                                                                                                // ) AS latest_balances
-                                                                                                                // GROUP BY latest_balances.user_id
-                                                                                                                // `, (err, results) => {
-                                                                                                                // if (err) {
-                                                                                                                // return reject(err);
-                                                                                                                // }
-                                                                                                                // total_user_balances = results[0].total_user_balances || 0;
-                                                                                                                // console.log("ppppp",total_user_balances );
-
-                                                                                                                // Proceed with the insert query
-                                                                                                                pool.query(
-                                                                                                                  `INSERT INTO application_statistics (
-                                                                datefor,
-                                                                kms_billed,
-                                                                customers_count,
-                                                                drivers_count,
-                                                                trips_count,
-                                                                trips_per_customer,
-                                                                billed_amount_usd,
-                                                                average_trip_rate_usd,
-                                                                mode_rate_usd,
-                                                                average_billed,
-                                                                new_customer_count,
-                                                                new_drivers_count,
-                                                                complaints_count,
-                                                                total_rating_count,
-                                                                ave_rating_count,
-                                                                driver_open_balance,
-                                                                driver_top_up,
-                                                                driver_billed_charges,
-                                                                driver_withdrawals,
-                                                                driver_escrow,
-                                                                driver_promo,
-                                                                driver_deductions,
-                                                                driver_additions,
-                                                                driver_close_balance,
-                                                                customer_open_balance,
-                                                                customer_to_up,
-                                                                customer_billed_charges,
-                                                                customer_withdrawals,
-                                                                customer_escrow,
-                                                                customer_promo,
-                                                                customer_deduction,
-                                                                customer_additions,
-                                                                customer_close_balance,
-                                                                company_open_balance,
-                                                                company_income_from_charges,
-                                                                company_promotions,
-                                                                company_withdraws_out,
-                                                                company_close_balance,
-                                                                sum_commission_uw,
-                                                                sum_commission_vw,
-                                                                sum_promotion_uw,
-                                                                sum_promotion_vw,
-                                                                sum_top_up_uw,
-                                                                sum_top_up_vw,
-                                                                sum_withdrawal_uw,
-                                                                sum_withdrawal_vw,
-                                                                sum_mischief_penalty_uw,
-                                                                sum_mischief_penalty_vw,
-                                                                signed_up_today,
-                                                                users_logged_in_today,
-                                                                users_logged_in_one_day_ago,
-                                                                users_logged_in_two_days_ago,
-                                                                users_logged_in_three_days_ago,
-                                                                users_logged_in_seven_days_ago,
-                                                                users_logged_in_fourteen_days_ago,
-                                                                users_logged_in_thirty_days_ago,
-                                                                average_engagement_time
-                                                            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-                                                                                                                  [
-                                                                                                                    datefor,
-                                                                                                                    kms_billed,
-                                                                                                                    customers_count,
-                                                                                                                    drivers_count,
-                                                                                                                    trips_count,
-                                                                                                                    trips_per_customer,
-                                                                                                                    billed_amount_usd,
-                                                                                                                    average_trip_rate_usd,
-                                                                                                                    mode_rate_usd,
-                                                                                                                    average_billed,
-                                                                                                                    new_customer_count,
-                                                                                                                    new_drivers_count,
-                                                                                                                    complaints_count,
-                                                                                                                    total_rating_count,
-                                                                                                                    ave_rating_count,
-                                                                                                                    driver_open_balance,
-                                                                                                                    driver_top_up,
-                                                                                                                    driver_billed_charges,
-                                                                                                                    driver_withdrawals,
-                                                                                                                    driver_escrow,
-                                                                                                                    driver_promo,
-                                                                                                                    driver_deductions,
-                                                                                                                    driver_additions,
-                                                                                                                    driver_close_balance,
-                                                                                                                    customer_open_balance,
-                                                                                                                    customer_to_up,
-                                                                                                                    customer_billed_charges,
-                                                                                                                    customer_withdrawals,
-                                                                                                                    customer_escrow,
-                                                                                                                    customer_promo,
-                                                                                                                    customer_deduction,
-                                                                                                                    customer_additions,
-                                                                                                                    customer_close_balance,
-                                                                                                                    company_open_balance,
-                                                                                                                    company_income_from_charges,
-                                                                                                                    company_promotions,
-                                                                                                                    company_withdraws_out,
-                                                                                                                    company_close_balance,
-                                                                                                                    sum_commission_uw,
-                                                                                                                    sum_commission_vw,
-                                                                                                                    sum_promotion_uw,
-                                                                                                                    sum_promotion_vw,
-                                                                                                                    sum_top_up_uw,
-                                                                                                                    sum_top_up_vw,
-                                                                                                                    sum_withdrawal_uw,
-                                                                                                                    sum_withdrawal_vw,
-                                                                                                                    sum_mischief_penalty_uw,
-                                                                                                                    sum_mischief_penalty_vw,
-                                                                                                                    signed_up_today, // Add the new fields here
-                                                                                                                    users_logged_in_today,
-                                                                                                                    users_logged_in_one_day_ago,
-                                                                                                                    users_logged_in_two_days_ago,
-                                                                                                                    users_logged_in_three_days_ago,
-                                                                                                                    users_logged_in_seven_days_ago,
-                                                                                                                    users_logged_in_fourteen_days_ago,
-                                                                                                                    users_logged_in_thirty_days_ago,
-                                                                                                                    average_engagement_time, // Add the new fields here
-                                                                                                                  ],
-                                                                                                                  (
-                                                                                                                    err,
-                                                                                                                    result
-                                                                                                                  ) => {
-                                                                                                                    if (
-                                                                                                                      err
-                                                                                                                    ) {
-                                                                                                                      return reject(
-                                                                                                                        err
-                                                                                                                      );
-                                                                                                                    }
-
-                                                                                                                    // Assuming you want to return the inserted data
-                                                                                                                    const insertedData =
-                                                                                                                      {
-                                                                                                                        id: result.insertId, // Get the ID of the newly inserted row
-                                                                                                                        // Include other fields that were inserted
-                                                                                                                        datefor,
-                                                                                                                        kms_billed,
-                                                                                                                        customers_count,
-                                                                                                                        drivers_count,
-                                                                                                                        trips_count,
-                                                                                                                        trips_per_customer,
-                                                                                                                        billed_amount_usd,
-                                                                                                                        average_trip_rate_usd,
-                                                                                                                        mode_rate_usd,
-                                                                                                                        average_billed,
-                                                                                                                        new_customer_count,
-                                                                                                                        new_drivers_count,
-                                                                                                                        complaints_count,
-                                                                                                                        total_rating_count,
-                                                                                                                        ave_rating_count,
-                                                                                                                        driver_open_balance,
-                                                                                                                        driver_top_up,
-                                                                                                                        driver_billed_charges,
-                                                                                                                        driver_withdrawals,
-                                                                                                                        driver_escrow,
-                                                                                                                        driver_promo,
-                                                                                                                        driver_deductions,
-                                                                                                                        driver_additions,
-                                                                                                                        driver_close_balance,
-                                                                                                                        customer_open_balance,
-                                                                                                                        customer_to_up,
-                                                                                                                        customer_billed_charges,
-                                                                                                                        customer_withdrawals,
-                                                                                                                        customer_escrow,
-                                                                                                                        customer_promo,
-                                                                                                                        customer_deduction,
-                                                                                                                        customer_additions,
-                                                                                                                        customer_close_balance,
-                                                                                                                        company_open_balance,
-                                                                                                                        company_income_from_charges,
-                                                                                                                        company_promotions,
-                                                                                                                        company_withdraws_out,
-                                                                                                                        company_close_balance,
-                                                                                                                        sum_commission_uw,
-                                                                                                                        sum_commission_vw,
-                                                                                                                        sum_promotion_uw,
-                                                                                                                        sum_promotion_vw,
-                                                                                                                        sum_top_up_uw,
-                                                                                                                        sum_top_up_vw,
-                                                                                                                        sum_withdrawal_uw,
-                                                                                                                        sum_withdrawal_vw,
-                                                                                                                        sum_mischief_penalty_uw,
-                                                                                                                        sum_mischief_penalty_vw,
-                                                                                                                        signed_up_today,
-                                                                                                                        users_logged_in_today,
-                                                                                                                        users_logged_in_one_day_ago,
-                                                                                                                        users_logged_in_two_days_ago,
-                                                                                                                        users_logged_in_three_days_ago,
-                                                                                                                        users_logged_in_seven_days_ago,
-                                                                                                                        users_logged_in_fourteen_days_ago,
-                                                                                                                        users_logged_in_thirty_days_ago,
-                                                                                                                        average_engagement_time,
-                                                                                                                      };
-
-                                                                                                                    return resolve(
-                                                                                                                      {
-                                                                                                                        status: 200,
-                                                                                                                        message:
-                                                                                                                          "Saving successful",
-                                                                                                                        data: insertedData,
-                                                                                                                      }
-                                                                                                                    );
-                                                                                                                  }
-                                                                                                                );
-                                                                                                              }
-                                                                                                            );
-                                                                                                          }
-                                                                                                        );
-                                                                                                      }
-                                                                                                    );
-                                                                                                  }
-                                                                                                );
-                                                                                              }
-                                                                                            );
-                                                                                          }
-                                                                                        );
-                                                                                      }
-                                                                                    );
-                                                                                  }
-                                                                                );
-                                                                              }
-                                                                            );
-                                                                          }
-                                                                        );
-                                                                      }
-                                                                    );
-                                                                  }
-                                                                );
-                                                              }
-                                                            );
-                                                          }
-                                                        );
-                                                      }
-                                                    );
-                                                  }
-                                                );
-                                              }
-                                            );
-                                          }
-                                        );
-                                      }
-                                    );
-                                  }
-                                );
-                              }
-                            );
-                          }
-                        );
-                      }
-                    );
-                  }
-                );
-              }
-            );
-          }
-        );
-      }
-    );
+// ---------------- Helper query function ----------------
+const query = (sql, params) =>
+  new Promise((resolve, reject) => {
+    pool.query(sql, params, (err, results) => {
+      if (err) return reject(err);
+      resolve(results);
+    });
   });
+
+// ---------------- POST / INSERT FULL STATISTICS ----------------
+crudsObj.postStatistic = async () => {
+  try {
+    console.log("Generating full application statistics with per-trip splits...");
+
+    const now = new Date();
+    now.setHours(now.getHours() + 2); // timezone adjustment
+    const datefor = now.toISOString().slice(0, 19).replace("T", " ");
+
+    // ---------------- CORE TRIP & USER AGGREGATES ----------------
+    const [
+      totalTripStats,
+      privateTripStats,
+      rideshareTripStats,
+      customerCount,
+      newCustomers,
+      driverCount,
+      newDrivers,
+      complaints,
+      ratings,
+      cancellations
+    ] = await Promise.all([
+      query("SELECT COUNT(*) trips_count, SUM(distance) kms_billed, SUM(accepted_cost) accepted_cost, AVG(accepted_cost) average_trip_rate_usd FROM trip"),
+      query("SELECT COUNT(*) private_trips_count, SUM(distance) private_kms_billed, SUM(accepted_cost) private_accepted_cost, AVG(accepted_cost) private_average_trip_rate_usd FROM trip WHERE trip_type='private'"),
+      query("SELECT COUNT(*) rideshare_trips_count, SUM(distance) rideshare_kms_billed, SUM(accepted_cost) rideshare_accepted_cost, AVG(accepted_cost) rideshare_average_trip_rate_usd FROM trip WHERE trip_type='rideshare'"),
+      query("SELECT COUNT(customerid) customers_count FROM customer_details"),
+      query(`SELECT 
+               SUM(CASE WHEN customer_type='private' AND signed_on >= CURDATE() THEN 1 ELSE 0 END) private_new_customers,
+               SUM(CASE WHEN customer_type='rideshare' AND signed_on >= CURDATE() THEN 1 ELSE 0 END) rideshare_new_customers
+             FROM customer_details`),
+      query("SELECT COUNT(driver_id) drivers_count FROM driver_details"),
+      query(`SELECT 
+               SUM(CASE WHEN driver_type='private' AND signed_on >= CURDATE() THEN 1 ELSE 0 END) private_new_drivers,
+               SUM(CASE WHEN driver_type='rideshare' AND signed_on >= CURDATE() THEN 1 ELSE 0 END) rideshare_new_drivers
+             FROM driver_details`),
+      query(`SELECT 
+               COUNT(*) total_complaints,
+               SUM(CASE WHEN trip_type='private' THEN 1 ELSE 0 END) private_complaints,
+               SUM(CASE WHEN trip_type='rideshare' THEN 1 ELSE 0 END) rideshare_complaints
+             FROM tickets`),
+      query(`SELECT 
+               SUM(customer_stars + driver_stars) total_rating_count,
+               AVG(customer_stars + driver_stars) ave_rating_count,
+               AVG(CASE WHEN trip_type='private' THEN customer_stars ELSE NULL END) private_average_rating,
+               AVG(CASE WHEN trip_type='rideshare' THEN customer_stars ELSE NULL END) rideshare_average_rating
+             FROM trip`),
+      query(`SELECT 
+               SUM(CASE WHEN trip_type='private' AND status ='Cancelled' THEN 1 ELSE 0 END) private_cancellations,
+               SUM(CASE WHEN trip_type='rideshare' AND status ='Cancelled' THEN 1 ELSE 0 END) rideshare_cancellations
+             FROM trip`)
+    ]);
+
+    // ---------------- DESTRUCTURE ----------------
+    const t = totalTripStats[0] || {};
+    const p = privateTripStats[0] || {};
+    const r = rideshareTripStats[0] || {};
+    const c = customerCount[0] || {};
+    const nc = newCustomers[0] || {};
+    const d = driverCount[0] || {};
+    const nd = newDrivers[0] || {};
+    const comp = complaints[0] || {};
+    const rate = ratings[0] || {};
+    const canc = cancellations[0] || {};
+
+    const trips_per_customer = c.customers_count > 0 ? t.trips_count / c.customers_count : 0;
+    const mode_rate_usd = Math.max(p.private_average_trip_rate_usd || 0, r.rideshare_average_trip_rate_usd || 0);
+
+    // ---------------- USER ACTIVITY ----------------
+    const today = new Date().toISOString().slice(0, 10);
+    const daysAgo = (d) => new Date(Date.now() - d * 86400000).toISOString().slice(0, 10);
+
+    const [
+      signedUpToday,
+      usersToday,
+      users1,
+      users2,
+      users3,
+      users7,
+      users14,
+      users30,
+      avgEngagement,
+    ] = await Promise.all([
+      query("SELECT COUNT(*) c FROM users WHERE signed_up_on = ?", [today]),
+      query("SELECT COUNT(*) c FROM users WHERE last_logged_in >= ? AND last_logged_in <= ?", [today, `${today} 23:59:59`]),
+      query("SELECT COUNT(*) c FROM users WHERE last_logged_in >= ? AND last_logged_in < ?", [daysAgo(1), today]),
+      query("SELECT COUNT(*) c FROM users WHERE last_logged_in >= ? AND last_logged_in < ?", [daysAgo(2), daysAgo(1)]),
+      query("SELECT COUNT(*) c FROM users WHERE last_logged_in >= ? AND last_logged_in < ?", [daysAgo(3), daysAgo(2)]),
+      query("SELECT COUNT(*) c FROM users WHERE last_logged_in >= ? AND last_logged_in < ?", [daysAgo(7), daysAgo(3)]),
+      query("SELECT COUNT(*) c FROM users WHERE last_logged_in >= ? AND last_logged_in < ?", [daysAgo(14), daysAgo(7)]),
+      query("SELECT COUNT(*) c FROM users WHERE last_logged_in >= ? AND last_logged_in < ?", [daysAgo(30), daysAgo(14)]),
+      query("SELECT AVG(TIMESTAMPDIFF(SECOND, last_logged_in, NOW())) avg FROM users WHERE last_logged_in >= ?", [daysAgo(30)]),
+    ]);
+
+    // ---------------- FINANCIAL AGGREGATES ----------------
+    const [walletSums] = await Promise.all([query(`
+      SELECT 
+        SUM(CASE WHEN trxn_code='CM' THEN user_wallet_credit ELSE 0 END) sum_commission_uw,
+        SUM(CASE WHEN trxn_code='CM' THEN vendor_wallet_credit ELSE 0 END) sum_commission_vw,
+        SUM(CASE WHEN trxn_code='PM' THEN user_wallet_debit ELSE 0 END) sum_promotion_uw,
+        SUM(CASE WHEN trxn_code='PM' THEN vendor_wallet_debit ELSE 0 END) sum_promotion_vw,
+        SUM(CASE WHEN trxn_code='TU' THEN user_wallet_debit ELSE 0 END) sum_top_up_uw,
+        SUM(CASE WHEN trxn_code='TU' THEN vendor_wallet_debit ELSE 0 END) sum_top_up_vw,
+        SUM(CASE WHEN trxn_code='WD' THEN user_wallet_credit ELSE 0 END) sum_withdrawal_uw,
+        SUM(CASE WHEN trxn_code='WD' THEN vendor_wallet_credit ELSE 0 END) sum_withdrawal_vw,
+        SUM(CASE WHEN trxn_code='MP' THEN user_wallet_credit ELSE 0 END) sum_mischief_penalty_uw,
+        SUM(CASE WHEN trxn_code='MP' THEN vendor_wallet_credit ELSE 0 END) sum_mischief_penalty_vw,
+        SUM(user_wallet_total_balance) user_wallet_total_balance,
+        SUM(main_wallet_total_balance) main_wallet_total_balance,
+        SUM(main_wallet_balance) main_wallet_balance,
+        SUM(revenue_wallet_total_balance) revenue_wallet_total_balance,
+        SUM(vendor_wallet_total_balance) vendor_wallet_total_balance,
+        SUM(escrow_total_balance) escrow_total_balance
+      FROM top_up
+      WHERE date = ?
+    `, [today]).then(r => r || [{}])]);
+
+    const w = walletSums[0] || {};
+
+    // ---------------- SAFE DEFAULTS ----------------
+    const defaults = {
+      private_cancellation_rate: 0.0,
+      rideshare_cancellation_rate: 0.0,
+      average_billed: 0.0,
+      private_rating_count: 0,
+      rideshare_rating_count: 0,
+      private_driver_open_balance: 0.0,
+      rideshare_driver_open_balance: 0.0,
+      private_driver_close_balance: 0.0,
+      rideshare_driver_close_balance: 0.0,
+      customer_to_up: 0,
+      customer_deduction: 0,
+      private_customer_close_balance: 0.0,
+      rideshare_customer_close_balance: 0.0,
+      private_billed_amount_company_usd: 0.0,
+      rideshare_billed_amount_company_usd: 0.0,
+    };
+
+    // ---------------- FINANCIAL OBJECTS ----------------
+    const dw = {
+      driver_open_balance: 0,
+      driver_top_up: 0,
+      driver_billed_charges: 0,
+      driver_withdrawals: 0,
+      driver_escrow: 0,
+      driver_promo: 0,
+      driver_deductions: 0,
+      driver_additions: 0,
+      driver_close_balance: 0
+    };
+
+    const cw = {
+      customer_open_balance: 0,
+      customer_to_up: 0,
+      customer_billed_charges: 0,
+      customer_withdrawals: 0,
+      customer_escrow: 0,
+      customer_promo: 0,
+      customer_additions: 0,
+      customer_close_balance: 0
+    };
+
+    const co = {
+      company_open_balance: 0,
+      company_income_from_charges: 0,
+      company_promotions: 0,
+      company_withdraws_out: 0,
+      company_close_balance: 0
+    };
+
+    // ---------------- INSERT ----------------
+const columns = [
+  "datefor", "kms_billed", "private_kms_billed", "rideshare_kms_billed",
+  "customers_count", "drivers_count",
+  "private_cancellations", "private_cancellation_rate",
+  "rideshare_cancellations", "rideshare_cancellation_rate",
+  "trips_count", "private_trips_count", "rideshare_trips_count", "trips_per_customer",
+  "billed_amount_usd", "private_billed_amount_usd", "private_average_trip_rate_usd",
+  "rideshare_billed_amount_usd", "rideshare_average_trip_rate_usd",
+  "average_trip_rate_usd", "mode_rate_usd", "average_billed",
+  "new_customer_count", "private_new_customers", "rideshare_new_customers",
+  "new_drivers_count", "private_new_drivers", "rideshare_new_drivers",
+  "complaints_count", "private_complaints", "rideshare_complaints",
+  "total_rating_count", "ave_rating_count", "private_average_rating", "private_rating_count",
+  "rideshare_average_rating", "rideshare_rating_count",
+  "driver_open_balance", "private_driver_open_balance", "rideshare_driver_open_balance",
+  "driver_top_up", "driver_billed_charges", "driver_withdrawals",
+  "driver_escrow", "driver_promo", "driver_deductions", "driver_additions", "driver_close_balance",
+  "private_driver_close_balance", "rideshare_driver_close_balance",
+  "customer_open_balance", "customer_to_up", "customer_billed_charges", "customer_withdrawals",
+  "customer_escrow", "customer_promo", "customer_deduction", "customer_additions", "customer_close_balance",
+  "private_customer_close_balance", "rideshare_customer_close_balance",
+  "company_open_balance", "company_income_from_charges", "private_billed_amount_company_usd", "rideshare_billed_amount_company_usd",
+  "company_promotions", "company_withdraws_out", "company_close_balance",
+  "sum_commission_uw", "sum_commission_vw", "sum_promotion_uw", "sum_promotion_vw",
+  "sum_top_up_uw", "sum_top_up_vw", "sum_withdrawal_uw", "sum_withdrawal_vw",
+  "sum_mischief_penalty_uw", "sum_mischief_penalty_vw",
+  "user_wallet_total_balance", "main_wallet_total_balance", "main_wallet_balance",
+  "revenue_wallet_total_balance", "vendor_wallet_total_balance", "escrow_total_balance",
+  "signed_up_today", "users_logged_in_today", "users_logged_in_one_day_ago",
+  "users_logged_in_two_days_ago", "users_logged_in_three_days_ago",
+  "users_logged_in_seven_days_ago", "users_logged_in_fourteen_days_ago",
+  "users_logged_in_thirty_days_ago", "average_engagement_time"
+];
+
+const values = [
+  datefor, t.kms_billed||0, p.private_kms_billed||0, r.rideshare_kms_billed||0,
+  c.customers_count||0, d.drivers_count||0,
+  canc.private_cancellations||0, defaults.private_cancellation_rate,
+  canc.rideshare_cancellations||0, defaults.rideshare_cancellation_rate,
+  t.trips_count||0, p.private_trips_count||0, r.rideshare_trips_count||0, trips_per_customer,
+  t.accepted_cost||0, p.private_accepted_cost||0, p.private_average_trip_rate_usd||0,
+  r.rideshare_accepted_cost||0, r.rideshare_average_trip_rate_usd||0,
+  t.accepted_cost||0, mode_rate_usd, defaults.average_billed,
+  (nc.private_new_customers||0)+(nc.rideshare_new_customers||0), nc.private_new_customers||0, nc.rideshare_new_customers||0,
+  (nd.private_new_drivers||0)+(nd.rideshare_new_drivers||0), nd.private_new_drivers||0, nd.rideshare_new_drivers||0,
+  comp.total_complaints||0, comp.private_complaints||0, comp.rideshare_complaints||0,
+  rate.total_rating_count||0, rate.ave_rating_count||0, rate.private_average_rating||0, defaults.private_rating_count,
+  rate.rideshare_average_rating||0, defaults.rideshare_rating_count,
+  dw.driver_open_balance||0, defaults.private_driver_open_balance, defaults.rideshare_driver_open_balance,
+  dw.driver_top_up||0, dw.driver_billed_charges||0, dw.driver_withdrawals||0,
+  dw.driver_escrow||0, dw.driver_promo||0, dw.driver_deductions||0, dw.driver_additions||0, dw.driver_close_balance||0,
+  defaults.private_driver_close_balance, defaults.rideshare_driver_close_balance,
+  cw.customer_open_balance||0, defaults.customer_to_up, cw.customer_billed_charges||0, cw.customer_withdrawals||0,
+  cw.customer_escrow||0, cw.customer_promo||0, defaults.customer_deduction, cw.customer_additions||0, cw.customer_close_balance||0,
+  defaults.private_customer_close_balance, defaults.rideshare_customer_close_balance,
+  co.company_open_balance||0, co.company_income_from_charges||0, defaults.private_billed_amount_company_usd, defaults.rideshare_billed_amount_company_usd,
+  co.company_promotions||0, co.company_withdraws_out||0, co.company_close_balance||0,
+  w.sum_commission_uw||0, w.sum_commission_vw||0, w.sum_promotion_uw||0, w.sum_promotion_vw||0,
+  w.sum_top_up_uw||0, w.sum_top_up_vw||0, w.sum_withdrawal_uw||0, w.sum_withdrawal_vw||0,
+  w.sum_mischief_penalty_uw||0, w.sum_mischief_penalty_vw||0,
+  w.user_wallet_total_balance||0, w.main_wallet_total_balance||0, w.main_wallet_balance||0,
+  w.revenue_wallet_total_balance||0, w.vendor_wallet_total_balance||0, w.escrow_total_balance||0,
+  signedUpToday[0].c||0, usersToday[0].c||0, users1[0].c||0, users2[0].c||0, users3[0].c||0,
+  users7[0].c||0, users14[0].c||0, users30[0].c||0, avgEngagement[0].avg||0
+];
+
+if (columns.length !== values.length) {
+  throw new Error(`Column count (${columns.length}) does not match value count (${values.length})`);
+}
+
+// ---------------- INSERT ----------------
+const insertResult = await query(
+  `INSERT INTO application_statistics (${columns.join(",")}) VALUES (${values.map(_=>"?").join(",")})`,
+  values
+);
+
+
+    return { status: 200, message: "Full statistics saved successfully", id: insertResult.insertId };
+  } catch (err) {
+    console.error("Error generating full statistics:", err);
+    throw err;
+  }
 };
 
-crudsObj.getStatistics = () => {
-  return new Promise((resolve, reject) => {
-    pool.query(
-      "SELECT * FROM application_statistics ORDER BY application_statistic_id DESC LIMIT 1 ",
-      (err, results) => {
-        if (err) {
-          return reject(err);
-        }
-        return resolve(results);
-      }
-    );
-  });
+
+
+/* ---------------- GET statistics by date range ---------------- */
+crudsObj.getStatisticsByDateRange = async (date_from, date_to) => {
+  return await query(
+    `SELECT * FROM application_statistics WHERE datefor BETWEEN ? AND ? ORDER BY datefor DESC`,
+    [date_from, date_to]
+  );
 };
 
-crudsObj.getStatisticsByDateRange = (datefrom, dateto) => {
-  return new Promise((resolve, reject) => {
-    pool.query(
-      "SELECT * FROM application_statistics WHERE datefor BETWEEN ? AND ?",
-      [datefrom, dateto],
-      (err, results) => {
-        if (err) {
-          return reject(err);
-        }
-        return resolve(results);
-      }
-    );
-  });
+/* ---------------- GET latest record ---------------- */
+crudsObj.getStatistics = async () => {
+  return await query(
+    `SELECT * FROM application_statistics ORDER BY datefor DESC LIMIT 1`
+  );
 };
 
-crudsObj.getStatisticById = (application_statistic_id) => {
-  return new Promise((resolve, reject) => {
-    pool.query(
-      "SELECT * FROM application_statistics WHERE application_statistic_id  = ? ",
-      [application_statistic_id],
-      (err, results) => {
-        if (err) {
-          return reject(err);
-        }
-        return resolve(results);
-      }
-    );
-  });
+/* ---------------- GET by ID ---------------- */
+crudsObj.getStatisticById = async (id) => {
+  const results = await query(`SELECT * FROM application_statistics WHERE application_statistic_id=?`, [id]);
+  return results[0];
 };
 
-crudsObj.updateStatistic = (application_statistic_id, updatedValues) => {
-  const {
-    datefor,
-    kms_billed,
-    customers_count,
-    drivers_count,
-    trips_count,
-    trips_per_customer,
-    billed_amount_usd,
-    average_trip_rate_usd,
-    mode_rate_usd,
-    average_billed,
-    new_customer_count,
-    new_drivers_count,
-    complaints_count,
-    total_rating_count,
-    ave_rating_count,
-    driver_open_balance,
-    driver_top_up,
-    driver_billed_charges,
-    driver_withdrawals,
-    driver_escrow,
-    driver_promo,
-    driver_deductions,
-    driver_additions,
-    driver_close_balance,
-    customer_open_balance,
-    customer_to_up,
-    customer_billed_charges,
-    customer_withdrawals,
-    customer_escrow,
-    customer_promo,
-    customer_deduction,
-    customer_additions,
-    customer_close_balance,
-    company_open_balance,
-    company_income_from_charges,
-    company_promotions,
-    company_withdraws_out,
-    company_close_balance,
-  } = updatedValues;
-
-  console.log("Updating record with ID:", application_statistic_id);
-  console.log("Updated values:", updatedValues);
-
-  return new Promise((resolve, reject) => {
-    pool.query(
-      `UPDATE application_statistics SET 
-              datefor =?,
-              kms_billed =?,
-              customers_count =?,
-              drivers_count =?,
-              trips_count =?,
-              trips_per_customer =?,
-              billed_amount_usd =?,
-              average_trip_rate_usd =?,
-              mode_rate_usd =?,
-              average_billed =?,
-              new_customer_count =?,
-              new_drivers_count =?,
-              complaints_count =?,
-              total_rating_count =?,
-              ave_rating_count =?,
-              driver_open_balance =?,
-              driver_top_up =?,
-              driver_billed_charges =?,
-              driver_withdrawals =?,
-              driver_escrow =?,
-              driver_promo =?,
-              driver_deductions =?,
-              driver_additions =?,
-              driver_close_balance =?,
-              customer_open_balance =?,
-              customer_to_up =?,
-              customer_billed_charges =?,
-              customer_withdrawals =?,
-              customer_escrow =?,
-              customer_promo =?,
-              customer_deduction =?,
-              customer_additions =?,
-              customer_close_balance =?,
-              company_open_balance =?,
-              company_income_from_charges =?,
-              company_promotions =?,
-              company_withdraws_out =?,
-              company_close_balance =?
-          WHERE application_statistic_id = ?`,
-      [
-        datefor,
-        kms_billed,
-        customers_count,
-        drivers_count,
-        trips_count,
-        trips_per_customer,
-        billed_amount_usd,
-        average_trip_rate_usd,
-        mode_rate_usd,
-        average_billed,
-        new_customer_count,
-        new_drivers_count,
-        complaints_count,
-        total_rating_count,
-        ave_rating_count,
-        driver_open_balance,
-        driver_top_up,
-        driver_billed_charges,
-        driver_withdrawals,
-        driver_escrow,
-        driver_promo,
-        driver_deductions,
-        driver_additions,
-        driver_close_balance,
-        customer_open_balance,
-        customer_to_up,
-        customer_billed_charges,
-        customer_withdrawals,
-        customer_escrow,
-        customer_promo,
-        customer_deduction,
-        customer_additions,
-        customer_close_balance,
-        company_open_balance,
-        company_income_from_charges,
-        company_promotions,
-        company_withdraws_out,
-        company_close_balance,
-        application_statistic_id, // Ensure this is passed as last parameter
-      ],
-      (err, result) => {
-        if (err) {
-          console.error("Error updating statistic:", err);
-          return reject(err);
-        }
-        if (result.affectedRows === 0) {
-          return resolve({
-            status: "404",
-            message: "Statistic not found or no changes made",
-          });
-        }
-        return resolve({ status: 200, message: "Update successful", result });
-      }
-    );
-  });
+/* ---------------- UPDATE ---------------- */
+crudsObj.updateStatistic = async (id, values) => {
+  const keys = Object.keys(values);
+  const params = Object.values(values);
+  const setString = keys.map(k => `${k}=?`).join(', ');
+  const sql = `UPDATE application_statistics SET ${setString} WHERE application_statistic_id=?`;
+  const result = await query(sql, [...params, id]);
+  return { status: 200, message: "Statistic updated", affectedRows: result.affectedRows };
 };
 
-crudsObj.deleteStatistic = (id) => {
-  return new Promise((resolve, reject) => {
-    pool.query(
-      "DELETE FROM application_statistics WHERE application_statistic_id  = ?",
-      [id],
-      (err, results) => {
-        if (err) {
-          return reject(err);
-        }
-        return resolve(results);
-      }
-    );
-  });
+/* ---------------- DELETE ---------------- */
+crudsObj.deleteStatistic = async (id) => {
+  const result = await query(`DELETE FROM application_statistics WHERE application_statistic_id=?`, [id]);
+  return { status: 200, message: "Statistic deleted", affectedRows: result.affectedRows };
+};
+
+/* ---------------- GET last 30 days records ---------------- */
+crudsObj.getLast30Days = async () => {
+  const thirtyDaysAgo = new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 19).replace("T", " ");
+  return await query(
+    `SELECT * FROM application_statistics WHERE datefor >= ? ORDER BY datefor DESC`,
+    [thirtyDaysAgo]
+  );
 };
 
 module.exports = crudsObj;
