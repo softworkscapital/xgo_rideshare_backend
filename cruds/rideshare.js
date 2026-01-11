@@ -82,6 +82,50 @@ crudsObj.getAllTrips = () =>
     });
   });
 
+
+/* ========================
+   GEO: Closest Requests
+======================== */
+
+crudsObj.getClosestRequests = (lat, lng, limit = 20) =>
+  new Promise((resolve, reject) => {
+    const sql = `
+      SELECT 
+        request_id,
+        rideshare_id,
+        passenger_id,
+        pickup_lat,
+        pickup_lng,
+        dropoff_lat,
+        dropoff_lng,
+        offer_amount,
+        accepted_amount,
+        status,
+        seat_number,
+        created_at,
+        updated_at,
+        fare_offer,
+        (
+          6371 * acos(
+            cos(radians(?))
+            * cos(radians(pickup_lat))
+            * cos(radians(pickup_lng) - radians(?))
+            + sin(radians(?))
+            * sin(radians(pickup_lat))
+          )
+        ) AS distance_km
+      FROM rideshare_requests
+      ORDER BY distance_km
+      LIMIT ?
+    `;
+
+    pool.query(sql, [lat, lng, lat, limit], (err, results) => {
+      if (err) return reject(err);
+      resolve(results);
+    });
+  });
+
+
 crudsObj.getTripById = (rideshare_id) =>
   new Promise((resolve, reject) => {
     pool.query("SELECT * FROM rideshare_trips WHERE rideshare_id = ?", [rideshare_id], (err, results) => {

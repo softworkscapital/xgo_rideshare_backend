@@ -121,6 +121,38 @@ RideShareRouter.get("/trips/:rideshare_id", async (req, res) => {
   }
 });
 
+
+/* ========================
+   Closest 20 Requests
+======================== */
+
+RideShareRouter.get("/closest_20_requests_near_me", async (req, res) => {
+  try {
+    const { pickup_lat, pickup_lng } = req.query;
+
+    if (
+      pickup_lat == null ||
+      pickup_lng == null ||
+      isNaN(pickup_lat) ||
+      isNaN(pickup_lng)
+    ) {
+      return res.status(400).json({
+        error: "pickup_lat and pickup_lng are required and must be numbers",
+      });
+    }
+
+    const lat = parseFloat(pickup_lat);
+    const lng = parseFloat(pickup_lng);
+
+    const results = await RideShareDb.getClosestRequests(lat, lng, 20);
+    res.json(results);
+  } catch (e) {
+    console.error("closest_20_requests_near_me failed:", e);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+
 RideShareRouter.get("/trips/driver/:driver_id", async (req, res) => {
   try {
     res.json(await RideShareDb.getTripsByDriverId(req.params.driver_id));
