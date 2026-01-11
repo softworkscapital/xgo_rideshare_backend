@@ -33,7 +33,7 @@ const CounterOfferRouter = require("./routes/counter_offer");
 const DriverAnalyticRouter = require("./routes/driver_analytics");
 const TripStatusAnalyticRouter = require("./routes/trip_status_analytics");
 const ConfigRouter = require("./routes/application_configs");
-//const StatisticRouter = require("./routes/application_statistics");
+const StatisticRouter = require("./routes/application_statistics");
 const WithdrawalRouter = require("./routes/application_withdrawals");
 const VehicleRouter = require("./routes/vehicles");
 const StatsHalfHourlyRouter = require("./routes/stats_half_hourly");
@@ -46,7 +46,7 @@ const JobTitlesRouter = require("./routes/job_title");
 const TicketProgressRouter = require("./routes/ticket_progress");
 
 const ChatRemsGasCommunityRouter = require("./routes/chat_rems_gas_community");
-//const rideshareRouter = require("./routes/rideshare");
+const rideshareRouter = require("./routes/rideshare");
 
 
 
@@ -113,7 +113,7 @@ app.use("/counter_offer", CounterOfferRouter);
 app.use("/driver_analytics", DriverAnalyticRouter);
 app.use("/trip_status_analytics", TripStatusAnalyticRouter);
 app.use("/application_configs", ConfigRouter);
-//app.use("/application_statistics", StatisticRouter);
+app.use("/application_statistics", StatisticRouter);
 app.use("/application_withdrawals", WithdrawalRouter);
 app.use("/vehicle", VehicleRouter);
 app.use("/stats_half_hourly", StatsHalfHourlyRouter)
@@ -124,9 +124,7 @@ app.use("/lastmilerouting", LastMileRoutingRouter)
 app.use("/jobtitle", JobTitlesRouter)
 app.use("/tickectprogress", TicketProgressRouter)
 app.use("/community", ChatRemsGasCommunityRouter);
-//app.use("/rideshare", rideshareRouter);
-
-
+app.use("/rideshare", rideshareRouter);
 
 
 
@@ -213,80 +211,80 @@ app.post("/driver/login", async (req, res) => {
 
 
 
-// //----------------------------- Creating an interval to post statistics every 24 hours-------------------------
+//----------------------------- Creating an interval to post statistics every 24 hours-------------------------
 
-// // Function to post application statistics
-// const postApplicationStatistics = async () => {
-//   try {
-//     const response = await axios.post(`https://srv547457.hstgr.cloud:3011/application_statistics`, {
-//       // Include any necessary data to send with the POST request
-//     });
-//     console.log("Statistics posted:", response.data);
-//   } catch (error) {
-//     console.error("Error posting statistics:", error.message);
-//   }
-// };
+// Function to post application statistics
+const postApplicationStatistics = async () => {
+  try {
+    const response = await axios.post(`https://srv547457.hstgr.cloud:3011/application_statistics`, {
+      // Include any necessary data to send with the POST request
+    });
+    console.log("Statistics posted:", response.data);
+  } catch (error) {
+    console.error("Error posting statistics:", error.message);
+  }
+};
 
-// // Function to calculate the time until midnight
-// const getTimeUntilMidnight = () => {
-//   const now = new Date();
-//   const midnight = new Date();
-//   midnight.setHours(24, 0, 0, 0); // Set to midnight
-//   return midnight - now; // Return the time in milliseconds
-// };
+// Function to calculate the time until midnight
+const getTimeUntilMidnight = () => {
+  const now = new Date();
+  const midnight = new Date();
+  midnight.setHours(24, 0, 0, 0); // Set to midnight
+  return midnight - now; // Return the time in milliseconds
+};
 
-// // Start the interval at midnight and repeat every 12 hours
-// const startMidnightInterval = () => {
-//   const timeUntilMidnight = getTimeUntilMidnight();
+// Start the interval at midnight and repeat every 12 hours
+const startMidnightInterval = () => {
+  const timeUntilMidnight = getTimeUntilMidnight();
 
-//   // Set a timeout to start the interval at midnight
-//   setTimeout(() => {
-//     postApplicationStatistics(); // Call immediately at midnight
-//     // Set an interval for every 12 hours (12 * 60 * 60 * 1000 milliseconds)
-//     setInterval(postApplicationStatistics, 12 * 60 * 60 * 1000);
-//   }, timeUntilMidnight);
-// };
+  // Set a timeout to start the interval at midnight
+  setTimeout(() => {
+    postApplicationStatistics(); // Call immediately at midnight
+    // Set an interval for every 12 hours (12 * 60 * 60 * 1000 milliseconds)
+    setInterval(postApplicationStatistics, 12 * 60 * 60 * 1000);
+  }, timeUntilMidnight);
+};
 
-// // Start the interval
-// //startMidnightInterval();
+// Start the interval
+startMidnightInterval();
 
 
 //--------------------------End of Creating an interval to post statistics every 24 hours-------------------------
 
 
 
-// //----------------------------- Creating an interval to post statistics every half hour-------------------------
-// // Function to post half-hourly statistics
-// const postHalfHourlyStatistics = async () => {
-//   try {
-//     const response = await axios.post(`https://srv547457.hstgr.cloud:3011/stats_half_hourly`, {
-//       // Include any necessary data to send with the POST request
-//     });
-//     console.log("Statistics posted:", response.data);
-//   } catch (error) {
-//     console.error("Error posting statistics:", error.message);
-//   }
-// };
+//----------------------------- Creating an interval to post statistics every half hour-------------------------
+// Function to post half-hourly statistics
+const postHalfHourlyStatistics = async () => {
+  try {
+    const response = await axios.post(`https://srv547457.hstgr.cloud:3011/stats_half_hourly`, {
+      // Include any necessary data to send with the POST request
+    });
+    console.log("Statistics posted:", response.data);
+  } catch (error) {
+    console.error("Error posting statistics:", error.message);
+  }
+};
 
-// // Function to calculate the time until the next 30-minute interval
-// const getTimeUntilNextInterval = () => {
-//   const now = new Date();
-//   const nextInterval = new Date(now);
-//   nextInterval.setMinutes(Math.ceil(now.getMinutes() / 30) * 30, 0, 0); // Round up to the next half hour
-//   return nextInterval - now; // Return the time in milliseconds
-// };
+// Function to calculate the time until the next 30-minute interval
+const getTimeUntilNextInterval = () => {
+  const now = new Date();
+  const nextInterval = new Date(now);
+  nextInterval.setMinutes(Math.ceil(now.getMinutes() / 30) * 30, 0, 0); // Round up to the next half hour
+  return nextInterval - now; // Return the time in milliseconds
+};
 
-// // Start the interval for posting every 30 minutes
-// const startHalfHourlyInterval = () => {
-//   const timeUntilNextInterval = getTimeUntilNextInterval();
+// Start the interval for posting every 30 minutes
+const startHalfHourlyInterval = () => {
+  const timeUntilNextInterval = getTimeUntilNextInterval();
 
-//   // Set a timeout to start the interval
-//   setTimeout(() => {
-//     postHalfHourlyStatistics(); // Call immediately at the next interval
-//     // Set an interval for every 30 minutes (30 * 60 * 1000 milliseconds)
-//     setInterval(postHalfHourlyStatistics, 30 * 60 * 1000);
-//   }, timeUntilNextInterval);
-// };
+  // Set a timeout to start the interval
+  setTimeout(() => {
+    postHalfHourlyStatistics(); // Call immediately at the next interval
+    // Set an interval for every 30 minutes (30 * 60 * 1000 milliseconds)
+    setInterval(postHalfHourlyStatistics, 30 * 60 * 1000);
+  }, timeUntilNextInterval);
+};
 
 // Start the interval
 //startHalfHourlyInterval();
@@ -296,18 +294,18 @@ app.post("/driver/login", async (req, res) => {
 
 
 
-const options = {
-  cert: fs.readFileSync('/etc/letsencrypt/live/srv547457.hstgr.cloud/fullchain.pem'),
-  key: fs.readFileSync('/etc/letsencrypt/live/srv547457.hstgr.cloud/privkey.pem')
-};
+// const options = {
+//   cert: fs.readFileSync('/etc/letsencrypt/live/srv547457.hstgr.cloud/fullchain.pem'),
+//   key: fs.readFileSync('/etc/letsencrypt/live/srv547457.hstgr.cloud/privkey.pem')
+// };
 
-https.createServer(options, app).listen(process.env.APPPORT || '3011', () => {
-  console.log('app is listening to port' + process.env.APPPORT);
-});
-
-
-
-
-// app.listen(PORT, () => {
-//   console.log("app is listening to port" + " " + PORT);
+// https.createServer(options, app).listen(process.env.APPPORT || '3011', () => {
+//   console.log('app is listening to port' + process.env.APPPORT);
 // });
+
+
+
+
+app.listen(PORT, () => {
+  console.log("app is listening to port" + " " + PORT);
+});
