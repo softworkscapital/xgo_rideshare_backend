@@ -248,45 +248,45 @@ const startMidnightInterval = () => {
 };
 
 // Start the interval
-startMidnightInterval();
+//startMidnightInterval();
 
 
 //--------------------------End of Creating an interval to post statistics every 24 hours-------------------------
 
 
 
-//----------------------------- Creating an interval to post statistics every half hour-------------------------
-// Function to post half-hourly statistics
-const postHalfHourlyStatistics = async () => {
-  try {
-    const response = await axios.post(`https://srv547457.hstgr.cloud:3011/stats_half_hourly`, {
-      // Include any necessary data to send with the POST request
-    });
-    console.log("Statistics posted:", response.data);
-  } catch (error) {
-    console.error("Error posting statistics:", error.message);
-  }
-};
+// //----------------------------- Creating an interval to post statistics every half hour-------------------------
+// // Function to post half-hourly statistics
+// const postHalfHourlyStatistics = async () => {
+//   try {
+//     const response = await axios.post(`https://srv547457.hstgr.cloud:3011/stats_half_hourly`, {
+//       // Include any necessary data to send with the POST request
+//     });
+//     console.log("Statistics posted:", response.data);
+//   } catch (error) {
+//     console.error("Error posting statistics:", error.message);
+//   }
+// };
 
-// Function to calculate the time until the next 30-minute interval
-const getTimeUntilNextInterval = () => {
-  const now = new Date();
-  const nextInterval = new Date(now);
-  nextInterval.setMinutes(Math.ceil(now.getMinutes() / 30) * 30, 0, 0); // Round up to the next half hour
-  return nextInterval - now; // Return the time in milliseconds
-};
+// // Function to calculate the time until the next 30-minute interval
+// const getTimeUntilNextInterval = () => {
+//   const now = new Date();
+//   const nextInterval = new Date(now);
+//   nextInterval.setMinutes(Math.ceil(now.getMinutes() / 30) * 30, 0, 0); // Round up to the next half hour
+//   return nextInterval - now; // Return the time in milliseconds
+// };
 
-// Start the interval for posting every 30 minutes
-const startHalfHourlyInterval = () => {
-  const timeUntilNextInterval = getTimeUntilNextInterval();
+// // Start the interval for posting every 30 minutes
+// const startHalfHourlyInterval = () => {
+//   const timeUntilNextInterval = getTimeUntilNextInterval();
 
-  // Set a timeout to start the interval
-  setTimeout(() => {
-    postHalfHourlyStatistics(); // Call immediately at the next interval
-    // Set an interval for every 30 minutes (30 * 60 * 1000 milliseconds)
-    setInterval(postHalfHourlyStatistics, 30 * 60 * 1000);
-  }, timeUntilNextInterval);
-};
+//   // Set a timeout to start the interval
+//   setTimeout(() => {
+//     postHalfHourlyStatistics(); // Call immediately at the next interval
+//     // Set an interval for every 30 minutes (30 * 60 * 1000 milliseconds)
+//     setInterval(postHalfHourlyStatistics, 30 * 60 * 1000);
+//   }, timeUntilNextInterval);
+// };
 
 // Start the interval
 //startHalfHourlyInterval();
@@ -296,18 +296,18 @@ const startHalfHourlyInterval = () => {
 
 
 
-// const options = {
-//   cert: fs.readFileSync('/etc/letsencrypt/live/srv547457.hstgr.cloud/fullchain.pem'),
-//   key: fs.readFileSync('/etc/letsencrypt/live/srv547457.hstgr.cloud/privkey.pem')
-// };
+const options = {
+  cert: fs.readFileSync('/etc/letsencrypt/live/srv547457.hstgr.cloud/fullchain.pem'),
+  key: fs.readFileSync('/etc/letsencrypt/live/srv547457.hstgr.cloud/privkey.pem')
+};
 
-// https.createServer(options, app).listen(process.env.APPPORT || '3011', () => {
-//   console.log('app is listening to port' + process.env.APPPORT);
-// });
-
-
-
-
-app.listen(PORT, () => {
-  console.log("app is listening to port" + " " + PORT);
+https.createServer(options, app).listen(process.env.APPPORT || '3011', () => {
+  console.log('app is listening to port' + process.env.APPPORT);
 });
+
+
+
+
+// app.listen(PORT, () => {
+//   console.log("app is listening to port" + " " + PORT);
+// });
