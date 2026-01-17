@@ -831,4 +831,73 @@ crudsObj.getJobTitlesWithUserCounts = () => {
   });
 };
 
+// Billing Preference Methods
+crudsObj.getBillingPreference = (userId) => {
+  return new Promise((resolve, reject) => {
+    pool.query(
+      "SELECT billing_preference FROM users WHERE userid = ?",
+      [userId],
+      (err, results) => {
+        if (err) {
+          return reject(err);
+        }
+        if (results.length === 0) {
+          return resolve(null);
+        }
+        return resolve(results[0].billing_preference || 'percentage');
+      }
+    );
+  });
+};
+
+crudsObj.updateBillingPreference = (userId, billingPreference) => {
+  return new Promise((resolve, reject) => {
+    // Validate billing preference value
+    const validPreferences = ['percentage', 'daily'];
+    if (!validPreferences.includes(billingPreference)) {
+      return reject(new Error('Invalid billing preference. Must be "percentage" or "daily"'));
+    }
+
+    pool.query(
+      "UPDATE users SET billing_preference = ? WHERE userid = ?",
+      [billingPreference, userId],
+      (err, result) => {
+        if (err) {
+          return reject(err);
+        }
+        if (result.affectedRows === 0) {
+          return resolve({ status: "404", message: "User not found" });
+        }
+        return resolve({
+          status: "200",
+          message: "Billing preference updated successfully",
+          billing_preference: billingPreference
+        });
+      }
+    );
+  });
+};
+
+crudsObj.getBillingStatistics = () => {
+  return new Promise((resolve, reject) => {
+    const query = `
+      SELECT 
+        billing_preference,
+        COUNT(*) as user_count,
+        ROUND(COUNT(*) * 100.0 / (SELECT COUNT(*) FROM users WHERE billing_preference IS NOT NULL), 2) as percentage
+      FROM users 
+      WHERE billing_preference IS NOT NULL
+      GROUP BY billing_preference
+      ORDER BY user_count DESC
+    `;
+
+    pool.query(query, (err, results) => {
+      if (err) {
+        return reject(err);
+      }
+      return resolve(results);
+    });
+  });
+};
+
 module.exports = crudsObj;

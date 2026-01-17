@@ -1,0 +1,61 @@
+minimum changes to the private ride side more changes to the rideshare side
+try to not break current things that are working as you do your changes
+
+
+
+changes required.
+
+- billing 
+preference was implemented in the settings screen in the 
+XGOLife App.
+
+the prefence is not implemented from the database side and bacekend 
+implement that.
+updaate the xgo dashboard [front end control center system] to have somewhere to show howmany are on which billing type 
+and on the user profiles somwhere.
+
+in the private ride the preference is not effected at the point where the
+ride is billed. we need to effect that.
+
+in the area of the rideshare, we need to also implement the billing preference
+
+
+
+
+-funnel on statistics
+
+the funnel structure we implemented for tracking how the users
+are progressing through the funnel. we want to use the structure
+for implementation in the application statistics screen so that also seen this insight
+in the xgo dashboard [front end control center system]
+
+
+
+-push notifications
+on passenger side and on driver side.
+the goal is for improved user experience where key status changes happen on a trip 
+the app shold send push notifcatuon
+suggested notifications add more or remove as you see necesary
+
+    Private ride
+driver side, there are x number private ride request passengers near you less than 2 km raduis
+driver side, passenger has sent a counter offer
+passenger side, driver has sent a counter offer
+passenger side, your ride has been accepted.
+passenger side, your driver is on the way.
+passenger side, your driver has arrived.
+
+
+    Rideshare
+driver side, there are x number rideshare request passengers near you less than 2 km raduis going to (most common destination)
+driver side, passenger has sent a counter offerpassenger side, driver has declined/rejected your offer
+passenger side, driver has sent a counter offer for your request
+passenger side, driver has accepted your request on the current offer
+passenger side, your driver is on the way.
+passenger side, your driver has arrived.
+
+
+-Comments / Feedback
+for rideshares missing end point, extend the db table to capture stars rating and comments like sone in the trips table.
+adjust necesary backend and front end for the rideshare driver side and passenger side
+the feed back page should be adjusted. it currently displays the private rides feedback only.

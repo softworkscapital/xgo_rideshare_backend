@@ -546,4 +546,211 @@ RideShareRouter.post("/fare-updates", async (req, res) => {
   }
 });
 
+/* ========================
+   Feedback Routes (matching trip table pattern)
+======================== */
+
+RideShareRouter.put("/feedback/customer-comment/:rideshareId", async (req, res) => {
+  try {
+    const { rideshareId } = req.params;
+    const { customer_comment, driver_stars, status } = req.body;
+
+    // Validate rating range if provided
+    if (driver_stars && (driver_stars < 1 || driver_stars > 5)) {
+      return res.status(400).json({
+        error: "Rating must be between 1 and 5"
+      });
+    }
+
+    const result = await RideShareDb.updateCustomerComment(rideshareId, {
+      customer_comment,
+      driver_stars,
+      status
+    });
+
+    res.json(result);
+  } catch (e) {
+    logRouteError("PUT /rideshare/feedback/customer-comment/:rideshareId", req, e);
+    return sendError(
+      res,
+      req,
+      { status: 500, message: "Failed to update customer comment", route: "PUT /rideshare/feedback/customer-comment/:rideshareId" },
+      e
+    );
+  }
+});
+
+RideShareRouter.put("/feedback/driver-comment/:rideshareId", async (req, res) => {
+  try {
+    const { rideshareId } = req.params;
+    const { driver_comment, customer_stars, status } = req.body;
+
+    // Validate rating range if provided
+    if (customer_stars && (customer_stars < 1 || customer_stars > 5)) {
+      return res.status(400).json({
+        error: "Rating must be between 1 and 5"
+      });
+    }
+
+    const result = await RideShareDb.updateDriverComment(rideshareId, {
+      driver_comment,
+      customer_stars,
+      status
+    });
+
+    res.json(result);
+  } catch (e) {
+    logRouteError("PUT /rideshare/feedback/driver-comment/:rideshareId", req, e);
+    return sendError(
+      res,
+      req,
+      { status: 500, message: "Failed to update driver comment", route: "PUT /rideshare/feedback/driver-comment/:rideshareId" },
+      e
+    );
+  }
+});
+
+RideShareRouter.get("/feedback/:rideshareId", async (req, res) => {
+  try {
+    const { rideshareId } = req.params;
+    const result = await RideShareDb.getTripFeedback(rideshareId);
+    
+    if (!result) {
+      return res.status(404).json({
+        error: "Feedback not found for this rideshare"
+      });
+    }
+
+    res.json(result);
+  } catch (e) {
+    logRouteError("GET /rideshare/feedback/:rideshareId", req, e);
+    return sendError(
+      res,
+      req,
+      { status: 500, message: "Failed to get feedback", route: "GET /rideshare/feedback/:rideshareId" },
+      e
+    );
+  }
+});
+
+RideShareRouter.get("/feedback", async (req, res) => {
+  try {
+    const result = await RideShareDb.getAllFeedback();
+    res.json(result);
+  } catch (e) {
+    logRouteError("GET /rideshare/feedback", req, e);
+    return sendError(
+      res,
+      req,
+      { status: 500, message: "Failed to get all feedback", route: "GET /rideshare/feedback" },
+      e
+    );
+  }
+});
+
+RideShareRouter.get("/feedback/stats", async (req, res) => {
+  try {
+    const result = await RideShareDb.getFeedbackStats();
+    res.json(result);
+  } catch (e) {
+    logRouteError("GET /rideshare/feedback/stats", req, e);
+    return sendError(
+      res,
+      req,
+      { status: 500, message: "Failed to get feedback stats", route: "GET /rideshare/feedback/stats" },
+      e
+    );
+  }
+});
+
+/* ========================
+   Rideshare Billing Routes
+======================== */
+
+RideShareRouter.post('/calculate-billing', async (req, res) => {
+  try {
+    const { driverId, distance, account_category } = req.body;
+    
+    if (!driverId || !distance || !account_category) {
+      return res.status(400).json({
+        error: "Missing required fields: driverId, distance, and account_category are required"
+      });
+    }
+    
+    const result = await RideShareDb.calculateRideshareBillingWithPreference(driverId, distance, account_category);
+    res.json(result);
+  } catch (error) {
+    logRouteError("POST /rideshare/calculate-billing", req, error);
+    return sendError(
+      res,
+      req,
+      { status: 500, message: "Failed to calculate rideshare billing", route: "POST /rideshare/calculate-billing" },
+      error
+    );
+  }
+});
+
+RideShareRouter.put('/update-billing/:rideshareId', async (req, res) => {
+  try {
+    const { rideshareId } = req.params;
+    const billingData = req.body;
+    
+    if (!billingData.billing_amount || !billingData.billing_type) {
+      return res.status(400).json({
+        error: "Missing required fields: billing_amount and billing_type are required"
+      });
+    }
+    
+    const result = await RideShareDb.updateRideshareBilling(rideshareId, billingData);
+    res.json(result);
+  } catch (error) {
+    logRouteError("PUT /rideshare/update-billing/:rideshareId", req, error);
+    return sendError(
+      res,
+      req,
+      { status: 500, message: "Failed to update rideshare billing", route: "PUT /rideshare/update-billing/:rideshareId" },
+      error
+    );
+  }
+});
+
+RideShareRouter.get('/driver-earnings/:driverId', async (req, res) => {
+  try {
+    const { driverId } = req.params;
+    const { startDate, endDate } = req.query;
+    
+    if (!startDate || !endDate) {
+      return res.status(400).json({
+        error: "Missing required query parameters: startDate and endDate are required"
+      });
+    }
+    
+    const result = await RideShareDb.getRideshareDriverEarnings(driverId, startDate, endDate);
+    res.json(result);
+  } catch (error) {
+    logRouteError("GET /rideshare/driver-earnings/:driverId", req, error);
+    return sendError(
+      res,
+      req,
+      { status: 500, message: "Failed to get rideshare driver earnings", route: "GET /rideshare/driver-earnings/:driverId" },
+      error
+    );
+  }
+});
+
+RideShareRouter.get('/billing-stats', async (req, res) => {
+  try {
+    const result = await RideShareDb.getRideshareBillingStats();
+    res.json(result);
+  } catch (error) {
+    logRouteError("GET /rideshare/billing-stats", req, error);
+    return sendError(
+      res,
+      req,
+      { status: 500, message: "Failed to get rideshare billing stats", route: "GET /rideshare/billing-stats" },
+      error
+    );
+  }
+});
+
 module.exports = RideShareRouter;

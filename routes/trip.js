@@ -101,9 +101,28 @@ tripRouter.post("/", async (req, res, next) => {
   }
 });
 
+// Route to get funnel analysis data for tracking user journey
+tripRouter.get("/funnel-analysis", async (req, res, next) => {
+  try {
+    const period = req.query.period || 'today';
+    let results = await tripDbOperations.getFunnelAnalysis(period);
+    res.json(results);
+  } catch (e) {
+    console.log(e);
+    res.sendStatus(500);
+  }
+});
 
-
-
+// Route to get trips with feedback data (comments and stars), sorted by most recent first
+tripRouter.get("/getlasttwentyfeedback", async (req, res, next) => {
+  try {
+    let results = await tripDbOperations.getTripsWithFeedback();
+    res.json(results);
+  } catch (e) {
+    console.log(e);
+    res.sendStatus(500);
+  }
+});
 
 tripRouter.get("/", async (req, res, next) => {
   try {
@@ -378,5 +397,64 @@ tripRouter.post('/end-trip/driver/:trip_id', (req, res) => {
     .catch(err => res.status(500).json({ error: err.message }));
 });
 
+/* ========================
+   Billing Preference Routes
+======================== */
+
+tripRouter.post('/calculate-billing', async (req, res) => {
+  try {
+    const { userId, distance, account_category } = req.body;
+    
+    if (!userId || !distance || !account_category) {
+      return res.status(400).json({
+        error: "Missing required fields: userId, distance, and account_category are required"
+      });
+    }
+    
+    const result = await tripDbOperations.calculateBillingWithPreference(userId, distance, account_category);
+    res.json(result);
+  } catch (error) {
+    console.error("Error calculating billing:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+tripRouter.put('/update-billing/:tripId', async (req, res) => {
+  try {
+    const { tripId } = req.params;
+    const billingData = req.body;
+    
+    if (!billingData.billing_amount || !billingData.billing_type) {
+      return res.status(400).json({
+        error: "Missing required fields: billing_amount and billing_type are required"
+      });
+    }
+    
+    const result = await tripDbOperations.updateTripBilling(tripId, billingData);
+    res.json(result);
+  } catch (error) {
+    console.error("Error updating trip billing:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+tripRouter.get('/driver-earnings/:driverId', async (req, res) => {
+  try {
+    const { driverId } = req.params;
+    const { startDate, endDate } = req.query;
+    
+    if (!startDate || !endDate) {
+      return res.status(400).json({
+        error: "Missing required query parameters: startDate and endDate are required"
+      });
+    }
+    
+    const result = await tripDbOperations.getDriverEarnings(driverId, startDate, endDate);
+    res.json(result);
+  } catch (error) {
+    console.error("Error getting driver earnings:", error);
+    res.status(500).json({ error: error.message });
+  }
+});
 
 module.exports = tripRouter;

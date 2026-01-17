@@ -401,4 +401,52 @@ userRouter.get("/job_titles/user_counts", async (req, res) => {
     res.sendStatus(500);
   }
 });
+
+// Billing Preference Routes
+userRouter.get("/billing-preference/:userId", async (req, res, next) => {
+  try {
+    const userId = req.params.userId;
+    const result = await usersDbOperations.getBillingPreference(userId);
+    
+    if (result === null) {
+      return res.status(404).json({ error: "User not found" });
+    }
+    
+    res.json({ billing_preference: result });
+  } catch (error) {
+    console.error("Error fetching billing preference:", error);
+    res.sendStatus(500);
+  }
+});
+
+userRouter.put("/billing-preference/:userId", async (req, res, next) => {
+  try {
+    const userId = req.params.userId;
+    const { billing_preference } = req.body;
+    
+    if (!billing_preference) {
+      return res.status(400).json({ error: "billing_preference is required" });
+    }
+    
+    const result = await usersDbOperations.updateBillingPreference(userId, billing_preference);
+    res.json(result);
+  } catch (error) {
+    console.error("Error updating billing preference:", error);
+    if (error.message.includes('Invalid billing preference')) {
+      return res.status(400).json({ error: error.message });
+    }
+    res.sendStatus(500);
+  }
+});
+
+userRouter.get("/billing-statistics", async (req, res, next) => {
+  try {
+    const result = await usersDbOperations.getBillingStatistics();
+    res.json(result);
+  } catch (error) {
+    console.error("Error fetching billing statistics:", error);
+    res.sendStatus(500);
+  }
+});
+
 module.exports = userRouter; // Export the userRouter

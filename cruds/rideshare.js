@@ -404,4 +404,281 @@ crudsObj.getFareUpdates = (rideshare_id) =>
     });
   });
 
+/* ========================
+   Feedback Methods (matching trip table pattern)
+======================== */
+
+crudsObj.updateCustomerComment = (rideshare_id, updatedValues) => {
+  const { customer_comment, driver_stars, status } = updatedValues;
+
+  return new Promise((resolve, reject) => {
+    const feedback_date = new Date().toISOString().slice(0, 19).replace('T', ' ');
+    
+    pool.query(
+      `UPDATE rideshare_trips 
+       SET customer_comment = ?, driver_stars = ?, feedback_date = ?, status = ?
+       WHERE rideshare_id = ?`,
+      [customer_comment, driver_stars, feedback_date, status, rideshare_id],
+      (err, result) => {
+        if (err) return reject(err);
+        if (result.affectedRows === 0) {
+          return reject(new Error('Rideshare trip not found'));
+        }
+        resolve({
+          status: 200,
+          message: 'Customer feedback updated successfully',
+          rideshare_id: rideshare_id,
+          feedback: {
+            customer_comment,
+            driver_stars,
+            feedback_date,
+            status
+          }
+        });
+      }
+    );
+  });
+};
+
+crudsObj.updateDriverComment = (rideshare_id, updatedValues) => {
+  const { driver_comment, customer_stars, status } = updatedValues;
+
+  return new Promise((resolve, reject) => {
+    const feedback_date = new Date().toISOString().slice(0, 19).replace('T', ' ');
+    
+    pool.query(
+      `UPDATE rideshare_trips 
+       SET driver_comment = ?, customer_stars = ?, feedback_date = ?, status = ?
+       WHERE rideshare_id = ?`,
+      [driver_comment, customer_stars, feedback_date, status, rideshare_id],
+      (err, result) => {
+        if (err) return reject(err);
+        if (result.affectedRows === 0) {
+          return reject(new Error('Rideshare trip not found'));
+        }
+        resolve({
+          status: 200,
+          message: 'Driver feedback updated successfully',
+          rideshare_id: rideshare_id,
+          feedback: {
+            driver_comment,
+            customer_stars,
+            feedback_date,
+            status
+          }
+        });
+      }
+    );
+  });
+};
+
+crudsObj.getTripFeedback = (rideshareId) =>
+  new Promise((resolve, reject) => {
+    pool.query(
+      `SELECT rideshare_id, customer_comment, driver_comment, driver_stars, customer_stars, feedback_date
+       FROM rideshare_trips 
+       WHERE rideshare_id = ?`,
+      [rideshareId],
+      (err, results) => {
+        if (err) return reject(err);
+        resolve(results[0] || null);
+      }
+    );
+  });
+
+crudsObj.getAllFeedback = () =>
+  new Promise((resolve, reject) => {
+    pool.query(
+      `SELECT rt.*, rd.driver_id, rd.origin_name, rd.destination_name, u.username, u.name as driver_name
+       FROM rideshare_trips rt
+       LEFT JOIN rideshare_trips rd ON rt.rideshare_id = rd.rideshare_id
+       LEFT JOIN users u ON rd.driver_id = u.userid
+       WHERE (rt.driver_stars IS NOT NULL OR rt.customer_stars IS NOT NULL)
+       ORDER BY rt.feedback_date DESC`,
+      (err, results) => {
+        if (err) return reject(err);
+        resolve(results);
+      }
+    );
+  });
+
+crudsObj.getFeedbackStats = () =>
+  new Promise((resolve, reject) => {
+    pool.query(
+      `SELECT 
+        COUNT(*) as total_feedback,
+        AVG(driver_stars) as average_driver_rating,
+        AVG(customer_stars) as average_customer_rating,
+        COUNT(CASE WHEN driver_stars = 5 THEN 1 END) as driver_five_star,
+        COUNT(CASE WHEN driver_stars = 4 THEN 1 END) as driver_four_star,
+        COUNT(CASE WHEN driver_stars = 3 THEN 1 END) as driver_three_star,
+        COUNT(CASE WHEN driver_stars = 2 THEN 1 END) as driver_two_star,
+        COUNT(CASE WHEN driver_stars = 1 THEN 1 END) as driver_one_star,
+        COUNT(CASE WHEN customer_stars = 5 THEN 1 END) as customer_five_star,
+        COUNT(CASE WHEN customer_stars = 4 THEN 1 END) as customer_four_star,
+        COUNT(CASE WHEN customer_stars = 3 THEN 1 END) as customer_three_star,
+        COUNT(CASE WHEN customer_stars = 2 THEN 1 END) as customer_two_star,
+        COUNT(CASE WHEN customer_stars = 1 THEN 1 END) as customer_one_star
+       FROM rideshare_trips 
+       WHERE driver_stars IS NOT NULL OR customer_stars IS NOT NULL`,
+      (err, results) => {
+        if (err) return reject(err);
+        resolve(results[0]);
+      }
+    );
+  });
+
+/* ========================
+   Billing Preference Methods for Rideshare
+======================== */
+
+crudsObj.calculateRideshareBillingWithPreference = (driverId, distance, account_category) => {
+  return new Promise(async (resolve, reject) => {
+    try {
+      // Get driver's billing preference
+      const usersDb = require('./users');
+      const billingPreference = await usersDb.getBillingPreference(driverId);
+      
+      // Get tariffs based on distance and account category
+      const tarrifsDb = require('./tarrifs');
+      const tariffs = await tarrifsDb.getActiveTarrifByDistance(distance, account_category);
+      
+      if (tariffs.length === 0) {
+        return reject(new Error('No tariff found for given distance and category'));
+      }
+      
+      const tariff = tariffs[0];
+      let billingAmount = 0;
+      let billingType = billingPreference || 'percentage'; // Default to percentage
+      let commissionAmount = 0;
+      let driverEarnings = 0;
+      
+      if (billingType === 'percentage') {
+        // Percentage-based billing: apply rate to base price
+        billingAmount = tariff.lower_price_limit * (tariff.rate / 100);
+        commissionAmount = billingAmount * 0.2; // 20% commission
+        driverEarnings = billingAmount - commissionAmount;
+      } else {
+        // Daily-based billing: use fixed daily rate
+        billingAmount = tariff.rate; // Assuming rate is daily amount
+        commissionAmount = billingAmount * 0.15; // 15% commission for daily
+        driverEarnings = billingAmount - commissionAmount;
+      }
+      
+      resolve({
+        billing_amount: billingAmount,
+        billing_type: billingType,
+        commission_amount: commissionAmount,
+        driver_earnings: driverEarnings,
+        tariff_used: tariff,
+        calculation: {
+          base_price: tariff.lower_price_limit,
+          rate: tariff.rate,
+          billing_preference: billingType,
+          commission_rate: billingType === 'percentage' ? 0.2 : 0.15
+        }
+      });
+    } catch (error) {
+      reject(error);
+    }
+  });
+};
+
+crudsObj.updateRideshareBilling = (rideshareId, billingData) => {
+  return new Promise((resolve, reject) => {
+    const {
+      billing_amount,
+      billing_type,
+      commission_amount,
+      driver_earnings
+    } = billingData;
+    
+    pool.query(
+      `UPDATE rideshare_trips 
+       SET billing_amount = ?, billing_type = ?, commission_amount = ?, driver_earnings = ?
+       WHERE rideshare_id = ?`,
+      [billing_amount, billing_type, commission_amount, driver_earnings, rideshareId],
+      (err, result) => {
+        if (err) return reject(err);
+        if (result.affectedRows === 0) {
+          return reject(new Error('Rideshare trip not found'));
+        }
+        resolve({
+          status: 200,
+          message: 'Rideshare billing updated successfully',
+          rideshare_id: rideshareId,
+          billing_data: billingData
+        });
+      }
+    );
+  });
+};
+
+crudsObj.getRideshareDriverEarnings = (driverId, startDate, endDate) => {
+  return new Promise((resolve, reject) => {
+    const query = `
+      SELECT 
+        rideshare_id,
+        billing_amount,
+        billing_type,
+        commission_amount,
+        driver_earnings,
+        created_at,
+        origin_name,
+        destination_name
+      FROM rideshare_trips 
+      WHERE driver_id = ? 
+      AND created_at BETWEEN ? AND ?
+      AND status = 'Completed'
+      ORDER BY created_at DESC
+    `;
+    
+    pool.query(query, [driverId, startDate, endDate], (err, results) => {
+      if (err) return reject(err);
+      
+      // Calculate totals
+      const totals = results.reduce((acc, trip) => {
+        acc.total_earnings += parseFloat(trip.driver_earnings || 0);
+        acc.total_commission += parseFloat(trip.commission_amount || 0);
+        acc.total_trips += 1;
+        return acc;
+      }, {
+        total_earnings: 0,
+        total_commission: 0,
+        total_trips: 0
+      });
+      
+      resolve({
+        trips: results,
+        totals: totals
+      });
+    });
+  });
+};
+
+crudsObj.getRideshareBillingStats = () => {
+  return new Promise((resolve, reject) => {
+    const query = `
+      SELECT 
+        billing_type,
+        COUNT(*) as trip_count,
+        SUM(billing_amount) as total_billing,
+        SUM(commission_amount) as total_commission,
+        SUM(driver_earnings) as total_earnings,
+        AVG(billing_amount) as avg_billing_per_trip,
+        AVG(driver_earnings) as avg_earnings_per_trip
+      FROM rideshare_trips 
+      WHERE billing_amount IS NOT NULL 
+      AND status = 'Completed'
+      GROUP BY billing_type
+      ORDER BY trip_count DESC
+    `;
+    
+    pool.query(query, (err, results) => {
+      if (err) return reject(err);
+      resolve(results);
+    });
+  });
+};
+
 module.exports = crudsObj;
