@@ -48,8 +48,9 @@ const TicketProgressRouter = require("./routes/ticket_progress");
 const ChatRemsGasCommunityRouter = require("./routes/chat_rems_gas_community");
 const rideshareRouter = require("./routes/rideshare");
 
-
-
+// Add new analytics routes
+const CustomerPerformanceRouter = require("./routes/customer_performance");
+const DriverEarningsRouter = require("./routes/driver_earnings");
 
 const pool = require("./cruds/poolfile");
 const bodyParser = require("body-parser");
@@ -126,8 +127,10 @@ app.use("/tickectprogress", TicketProgressRouter)
 app.use("/community", ChatRemsGasCommunityRouter);
 app.use("/rideshare", rideshareRouter);
 
-
-
+// Add new analytics routes
+app.use("/commission/analytics/customers-performance", CustomerPerformanceRouter);
+app.use("/commission/analytics/drivers-summary", DriverEarningsRouter);
+app.use("/commission/earnings", DriverEarningsRouter);
 
 pesepay.resultUrl = "https://localhost:3011/payment-result";
 pesepay.returnUrl = "XgoLife://home";
