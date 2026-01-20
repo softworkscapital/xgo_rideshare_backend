@@ -1321,4 +1321,14 @@ crudsObj.getDriverEarnings = (driverId, startDate, endDate) => {
   });
 };
 
+crudsObj.getTripsByStatus = (status) => {
+  return new Promise((resolve, reject) => {
+    const query = 'SELECT * FROM trip WHERE status = ? ORDER BY trip_id DESC';
+    pool.query(query, [status], (err, results) => {
+      if (err) return reject(err);
+      resolve(results);
+    });
+  });
+};
+
 module.exports = crudsObj

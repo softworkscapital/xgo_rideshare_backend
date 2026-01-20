@@ -410,4 +410,134 @@ CustomerRouter.put("/:id/coordinates", async (req, res, next) => {
   }
 });
 
+// NEW ROUTES FOR COMPREHENSIVE CUSTOMER TRIP TRACKING
+
+// Update customer completed trips count and revenue
+CustomerRouter.put("/:id/completed_trip", async (req, res, next) => {
+  try {
+    let customer_id = req.params.id;
+    const { tripRevenue } = req.body;
+
+    let results = await CustomersDbOperations.updateCustomerCompletedTrips(
+      customer_id,
+      tripRevenue || 0
+    );
+    res.json(results);
+  } catch (e) {
+    console.log(e);
+    res.status(500).json({ error: "Failed to update customer completed trips", message: e.message });
+  }
+});
+
+// Update customer cancelled trips count
+CustomerRouter.put("/:id/cancelled_trip", async (req, res, next) => {
+  try {
+    let customer_id = req.params.id;
+
+    let results = await CustomersDbOperations.updateCustomerCancelledTrips(customer_id);
+    res.json(results);
+  } catch (e) {
+    console.log(e);
+    res.status(500).json({ error: "Failed to update customer cancelled trips", message: e.message });
+  }
+});
+
+// Update customer rating given to driver
+CustomerRouter.put("/:id/rating", async (req, res, next) => {
+  try {
+    let customer_id = req.params.id;
+    const { rating } = req.body;
+
+    if (!rating || rating < 1 || rating > 5) {
+      return res.status(400).json({ error: "Invalid rating. Must be between 1 and 5." });
+    }
+
+    let results = await CustomersDbOperations.updateCustomerRatingGiven(customer_id, rating);
+    res.json(results);
+  } catch (e) {
+    console.log(e);
+    res.status(500).json({ error: "Failed to update customer rating", message: e.message });
+  }
+});
+
+// Get comprehensive customer trip statistics
+CustomerRouter.get("/:id/trip_statistics", async (req, res, next) => {
+  try {
+    let customer_id = req.params.id;
+
+    let results = await CustomersDbOperations.getCustomerTripStatistics(customer_id);
+    res.json(results);
+  } catch (e) {
+    console.log(e);
+    res.status(500).json({ error: "Failed to get customer trip statistics", message: e.message });
+  }
+});
+
+// ===========================================
+// REAL-TIME STATUS UPDATE ENDPOINTS (Using CRUD Functions)
+// ===========================================
+
+// Update customer private trip status
+CustomerRouter.put("/:id/private_trip_status", async (req, res, next) => {
+  try {
+    let customer_id = req.params.id;
+    const { status, tripRevenue = 0, rating = null } = req.body;
+
+    let results = await CustomersDbOperations.updateCustomerPrivateTripStatus(customer_id, status, tripRevenue, rating);
+    res.json(results);
+    
+  } catch (e) {
+    console.log(e);
+    res.status(500).json({ error: "Failed to update customer private trip status", message: e.message });
+  }
+});
+
+// Update customer rideshare request status
+CustomerRouter.put("/:id/rideshare_request_status", async (req, res, next) => {
+  try {
+    let customer_id = req.params.id;
+    const { status, offerAmount = 0, rating = null } = req.body;
+
+    let results = await CustomersDbOperations.updateCustomerRideshareRequestStatus(customer_id, status, offerAmount, rating);
+    res.json(results);
+    
+  } catch (e) {
+    console.log(e);
+    res.status(500).json({ error: "Failed to update customer rideshare request status", message: e.message });
+  }
+});
+
+// ===========================================
+// CUSTOMER PERFORMANCE RATING ENDPOINT
+// ===========================================
+
+// Update customer performance rating (ratings received from drivers)
+CustomerRouter.put("/:id/customer_performance_rating", async (req, res, next) => {
+  try {
+    let customer_id = req.params.id;
+    const { rating, tripType } = req.body;
+
+    let results = await CustomersDbOperations.updateCustomerPerformanceRating(customer_id, rating, tripType);
+    res.json(results);
+    
+  } catch (e) {
+    console.log(e);
+    res.status(500).json({ error: "Failed to update customer performance rating", message: e.message });
+  }
+});
+
+// Get customer performance ratings
+CustomerRouter.get("/:id/performance_ratings", async (req, res, next) => {
+  try {
+    let customer_id = req.params.id;
+
+    let results = await CustomersDbOperations.getCustomerPerformanceRatings(customer_id);
+    res.json(results);
+    
+  } catch (e) {
+    console.log(e);
+    res.status(500).json({ error: "Failed to get customer performance ratings", message: e.message });
+  }
+});
+
 module.exports = CustomerRouter;

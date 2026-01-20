@@ -47,6 +47,11 @@ const TicketProgressRouter = require("./routes/ticket_progress");
 
 const ChatRemsGasCommunityRouter = require("./routes/chat_rems_gas_community");
 const rideshareRouter = require("./routes/rideshare");
+const notificationRouter = require("./routes/notifications");
+const notificationAnalyticsRouter = require("./routes/notificationAnalytics");
+
+// Add ride matching settings routes
+const RideMatchingSettingsRouter = require("./routes/ride_matching_settings");
 
 // Add new analytics routes
 const CustomerPerformanceRouter = require("./routes/customer_performance");
@@ -131,6 +136,16 @@ app.use("/rideshare", rideshareRouter);
 app.use("/commission/analytics/customers-performance", CustomerPerformanceRouter);
 app.use("/commission/analytics/drivers-summary", DriverEarningsRouter);
 app.use("/commission/earnings", DriverEarningsRouter);
+
+// Add notification routes
+const NotificationRouter = require("./routes/notifications");
+app.use("/notifications", NotificationRouter);
+
+// Add notification analytics routes
+app.use("/analytics/notifications", notificationAnalyticsRouter);
+
+// Add ride matching settings routes
+app.use("/", RideMatchingSettingsRouter);
 
 pesepay.resultUrl = "https://localhost:3011/payment-result";
 pesepay.returnUrl = "XgoLife://home";

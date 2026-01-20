@@ -2,6 +2,7 @@ const express = require("express");
 const tripRouter = express.Router();
 const tripDbOperations = require("../cruds/trip");
 const NewOrderObj = require("../cruds/NewOrderHandler");
+const notificationTriggers = require("../services/notificationTriggers");
 
 tripRouter.post("/", async (req, res, next) => {
   try {
@@ -94,6 +95,43 @@ tripRouter.post("/", async (req, res, next) => {
       commercial_value_delivery_category
     );
 
+    // NOTIFICATION INTEGRATION: Trip Created
+    if (results && results.insertId) {
+      try {
+        // If this is a private ride trip, notify nearby drivers
+        if (postedValues.trip_type === 'private' || !postedValues.trip_type) {
+          const passengerLocation = {
+            lat: parseFloat(origin_location_lat),
+            lng: parseFloat(origin_location_long)
+          };
+          
+          await notificationTriggers.notifyNearbyDriversPrivateRide(
+            passengerLocation,
+            cust_id,
+            postedValues.customer_name || 'Customer'
+          );
+          
+          console.log(`📱 Notified nearby drivers about new private trip ${results.insertId}`);
+        }
+        
+        // Schedule no-match suggestion if applicable
+        if (postedValues.trip_type === 'private') {
+          await notificationTriggers.scheduleSmartNotification(
+            cust_id,
+            'no_match_suggestion',
+            {
+              currentOffer: delivery_cost_proposed || 0,
+              suggestedOffer: Math.ceil((delivery_cost_proposed || 0) * 1.1) // 10% increase
+            },
+            300 // 5 minutes
+          );
+        }
+      } catch (notificationError) {
+        console.error('❌ Error sending trip creation notification:', notificationError);
+        // Don't fail the trip creation if notification fails
+      }
+    }
+
     res.json(results);
   } catch (e) {
     console.log(e);
@@ -134,9 +172,6 @@ tripRouter.get("/", async (req, res, next) => {
   }
 });
 
-
-
-
 // Route to get delayed trips where current time is greater than estimate_order_end_datetime
 tripRouter.get("/delayedtrips", async (req, res, next) => {
   try {
@@ -148,10 +183,6 @@ tripRouter.get("/delayedtrips", async (req, res, next) => {
   }
 });
 
-
-
-
-
 tripRouter.get("/drivers/:driverId", async (req, res) => {
   try {
     const driverId = req.params.driverId;
@@ -162,6 +193,7 @@ tripRouter.get("/drivers/:driverId", async (req, res) => {
     res.sendStatus(500);
   }
 });
+
 tripRouter.get("/driver_id/status", async (req, res, next) => {
   const { driver_id, status } = req.query;
 
@@ -175,51 +207,7 @@ tripRouter.get("/driver_id/status", async (req, res, next) => {
     let results = await tripDbOperations.getNumberofTrips(driver_id, status);
     res.json({ tripCount: results });
   } catch (e) {
-    console.log(e);
-    res.sendStatus(500);
-  }
-});
-
-tripRouter.get("/getting_joined_tables_using_trip_id/:trip_id", async (req, res, next) => {
-  const tripId = req.params.trip_id;
-
-  try {
-    let results = await tripDbOperations.getTripDetailsOfTablesById(tripId);
-    if (results.length === 0) {
-      return res.status(404).json({ message: "Trip not found" });
-    }
-    res.json(results);
-  } catch (e) {
-    console.log(e);
-    res.sendStatus(500);
-  }
-});
-
-
-tripRouter.put("/updateStatusAndDriver/:id", async (req, res, next) => {
-  try {
-    const trip_id = req.params.id;
-    const { driver_id, status } = req.body;
-
-    if (!driver_id || !status) {
-      return res.status(400).json({ error: "Driver ID and status are required." });
-    }
-
-    const result = await tripDbOperations.updateStatusAndDriver(trip_id, driver_id, status);
-    res.json(result);
-  } catch (e) {
-    console.log(e);
-    res.sendStatus(500);
-  }
-});
-
-tripRouter.get("/tripsbystatus/:status", async (req, res, next) => {
-  try {
-    let status = req.params.status;
-    let results = await tripDbOperations.getTripToDash(status);
-    res.json(results);
-  } catch (e) {
-    console.log(e);
+    console.error(e);
     res.sendStatus(500);
   }
 });
@@ -294,9 +282,6 @@ tripRouter.get("/customer/notify/:id", async (req, res, next) => {
   }
 });
 
-
-
-
 tripRouter.get("/:id", async (req, res, next) => {
   try {
     let id = req.params.id;
@@ -320,7 +305,6 @@ tripRouter.put("/:id", async (req, res, next) => {
     res.sendStatus(500);
   }
 });
-
 
 //#########################
 tripRouter.get('/mylastTwentyTripsById/:customer_id/:driver_id', async (req, res, next) => {
@@ -381,6 +365,7 @@ tripRouter.delete("/:id", async (req, res, next) => {
     res.sendStatus(500);
   }
 });
+
 tripRouter.post('/end-trip/customer/:trip_id', (req, res) => {
   const trip_id = req.params.trip_id;
   tripDbOperations.endTripByCustomer(trip_id)
@@ -438,22 +423,21 @@ tripRouter.put('/update-billing/:tripId', async (req, res) => {
   }
 });
 
-tripRouter.get('/driver-earnings/:driverId', async (req, res) => {
+tripRouter.get("/tripsbystatus/:status", async (req, res, next) => {
+  const { status } = req.params;
+  
+  if (!status) {
+    return res
+      .status(400)
+      .json({ error: "Status parameter is required." });
+  }
+
   try {
-    const { driverId } = req.params;
-    const { startDate, endDate } = req.query;
-    
-    if (!startDate || !endDate) {
-      return res.status(400).json({
-        error: "Missing required query parameters: startDate and endDate are required"
-      });
-    }
-    
-    const result = await tripDbOperations.getDriverEarnings(driverId, startDate, endDate);
-    res.json(result);
-  } catch (error) {
-    console.error("Error getting driver earnings:", error);
-    res.status(500).json({ error: error.message });
+    let results = await tripDbOperations.getTripsByStatus(status);
+    res.json(results);
+  } catch (e) {
+    console.error("Error fetching trips by status:", e);
+    res.status(500).json({ error: "Internal server error" });
   }
 });
 

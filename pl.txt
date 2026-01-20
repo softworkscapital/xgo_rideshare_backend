@@ -31,11 +31,19 @@ in the xgo dashboard [front end control center system]
 
 
 
+guideline push notifications
+
+
 -push notifications
 on passenger side and on driver side.
 the goal is for improved user experience where key status changes happen on a trip 
-the app shold send push notifcatuon
-suggested notifications add more or remove as you see necesary
+
+the app should send push notifcations
+suggested notifications 
+you can add more or remove as you see necesary
+  our othe goalsis also to reduce  the number of passengers failing to get matched with driver. we want to increas the rate at which a user who initiated a trip get matched and sonsequenctly completes their trip sucessfully you are free to suggest and improve our guideline
+
+
 
     Private ride
 driver side, there are x number private ride request passengers near you less than 2 km raduis

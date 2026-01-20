@@ -82,6 +82,15 @@ crudsObj.getAllTrips = () =>
     });
   });
 
+crudsObj.getAllTripsWithLimit = (limit) =>
+  new Promise((resolve, reject) => {
+    const sql = "SELECT * FROM rideshare_trips ORDER BY rideshare_id DESC LIMIT ?";
+    pool.query(sql, [limit], (err, results) => {
+      if (err) return reject(err);
+      resolve(results);
+    });
+  });
+
 
 /* ========================
    GEO: Closest Requests
@@ -408,30 +417,30 @@ crudsObj.getFareUpdates = (rideshare_id) =>
    Feedback Methods (matching trip table pattern)
 ======================== */
 
-crudsObj.updateCustomerComment = (rideshare_id, updatedValues) => {
-  const { customer_comment, driver_stars, status } = updatedValues;
+crudsObj.updateCustomerComment = (request_id, updatedValues) => {
+  const { customer_comment_for_driver, customer_rates_driver, status } = updatedValues;
 
   return new Promise((resolve, reject) => {
-    const feedback_date = new Date().toISOString().slice(0, 19).replace('T', ' ');
+    const customer_feedback_date = new Date().toISOString().slice(0, 19).replace('T', ' ');
     
     pool.query(
-      `UPDATE rideshare_trips 
-       SET customer_comment = ?, driver_stars = ?, feedback_date = ?, status = ?
-       WHERE rideshare_id = ?`,
-      [customer_comment, driver_stars, feedback_date, status, rideshare_id],
+      `UPDATE rideshare_requests 
+       SET customer_comment_for_driver = ?, customer_rates_driver = ?, customer_feedback_date = ?, status = ?
+       WHERE request_id = ?`,
+      [customer_comment_for_driver, customer_rates_driver, customer_feedback_date, status, request_id],
       (err, result) => {
         if (err) return reject(err);
         if (result.affectedRows === 0) {
-          return reject(new Error('Rideshare trip not found'));
+          return reject(new Error('Rideshare request not found'));
         }
         resolve({
           status: 200,
           message: 'Customer feedback updated successfully',
-          rideshare_id: rideshare_id,
+          request_id: request_id,
           feedback: {
-            customer_comment,
-            driver_stars,
-            feedback_date,
+            customer_comment_for_driver,
+            customer_rates_driver,
+            customer_feedback_date,
             status
           }
         });
@@ -440,30 +449,30 @@ crudsObj.updateCustomerComment = (rideshare_id, updatedValues) => {
   });
 };
 
-crudsObj.updateDriverComment = (rideshare_id, updatedValues) => {
-  const { driver_comment, customer_stars, status } = updatedValues;
+crudsObj.updateDriverComment = (request_id, updatedValues) => {
+  const { driver_comment_for_customer, driver_rates_customer, status } = updatedValues;
 
   return new Promise((resolve, reject) => {
-    const feedback_date = new Date().toISOString().slice(0, 19).replace('T', ' ');
+    const driver_feedback_date = new Date().toISOString().slice(0, 19).replace('T', ' ');
     
     pool.query(
-      `UPDATE rideshare_trips 
-       SET driver_comment = ?, customer_stars = ?, feedback_date = ?, status = ?
-       WHERE rideshare_id = ?`,
-      [driver_comment, customer_stars, feedback_date, status, rideshare_id],
+      `UPDATE rideshare_requests 
+       SET driver_comment_for_customer = ?, driver_rates_customer = ?, driver_feedback_date = ?, status = ?
+       WHERE request_id = ?`,
+      [driver_comment_for_customer, driver_rates_customer, driver_feedback_date, status, request_id],
       (err, result) => {
         if (err) return reject(err);
         if (result.affectedRows === 0) {
-          return reject(new Error('Rideshare trip not found'));
+          return reject(new Error('Rideshare request not found'));
         }
         resolve({
           status: 200,
           message: 'Driver feedback updated successfully',
-          rideshare_id: rideshare_id,
+          request_id: request_id,
           feedback: {
-            driver_comment,
-            customer_stars,
-            feedback_date,
+            driver_comment_for_customer,
+            driver_rates_customer,
+            driver_feedback_date,
             status
           }
         });
@@ -472,13 +481,13 @@ crudsObj.updateDriverComment = (rideshare_id, updatedValues) => {
   });
 };
 
-crudsObj.getTripFeedback = (rideshareId) =>
+crudsObj.getTripFeedback = (request_id) =>
   new Promise((resolve, reject) => {
     pool.query(
-      `SELECT rideshare_id, customer_comment, driver_comment, driver_stars, customer_stars, feedback_date
-       FROM rideshare_trips 
-       WHERE rideshare_id = ?`,
-      [rideshareId],
+      `SELECT request_id, customer_comment_for_driver, driver_comment_for_customer, driver_rates_customer, customer_rates_driver, customer_feedback_date, driver_feedback_date
+       FROM rideshare_requests 
+       WHERE request_id = ?`,
+      [request_id],
       (err, results) => {
         if (err) return reject(err);
         resolve(results[0] || null);
@@ -489,12 +498,14 @@ crudsObj.getTripFeedback = (rideshareId) =>
 crudsObj.getAllFeedback = () =>
   new Promise((resolve, reject) => {
     pool.query(
-      `SELECT rt.*, rd.driver_id, rd.origin_name, rd.destination_name, u.username, u.name as driver_name
-       FROM rideshare_trips rt
-       LEFT JOIN rideshare_trips rd ON rt.rideshare_id = rd.rideshare_id
+      `SELECT rr.*, rd.driver_id, rd.origin_name, rd.destination_name, u.username, u.name as driver_name,
+              cd.name as customer_name
+       FROM rideshare_requests rr
+       LEFT JOIN rideshare_trips rd ON rr.rideshare_id = rd.rideshare_id
        LEFT JOIN users u ON rd.driver_id = u.userid
-       WHERE (rt.driver_stars IS NOT NULL OR rt.customer_stars IS NOT NULL)
-       ORDER BY rt.feedback_date DESC`,
+       LEFT JOIN customer_details cd ON rr.customer_id = cd.customerid
+       WHERE (rr.customer_rates_driver IS NOT NULL OR rr.driver_rates_customer IS NOT NULL)
+       ORDER BY GREATEST(rr.customer_feedback_date, rr.driver_feedback_date) DESC`,
       (err, results) => {
         if (err) return reject(err);
         resolve(results);
@@ -507,20 +518,20 @@ crudsObj.getFeedbackStats = () =>
     pool.query(
       `SELECT 
         COUNT(*) as total_feedback,
-        AVG(driver_stars) as average_driver_rating,
-        AVG(customer_stars) as average_customer_rating,
-        COUNT(CASE WHEN driver_stars = 5 THEN 1 END) as driver_five_star,
-        COUNT(CASE WHEN driver_stars = 4 THEN 1 END) as driver_four_star,
-        COUNT(CASE WHEN driver_stars = 3 THEN 1 END) as driver_three_star,
-        COUNT(CASE WHEN driver_stars = 2 THEN 1 END) as driver_two_star,
-        COUNT(CASE WHEN driver_stars = 1 THEN 1 END) as driver_one_star,
-        COUNT(CASE WHEN customer_stars = 5 THEN 1 END) as customer_five_star,
-        COUNT(CASE WHEN customer_stars = 4 THEN 1 END) as customer_four_star,
-        COUNT(CASE WHEN customer_stars = 3 THEN 1 END) as customer_three_star,
-        COUNT(CASE WHEN customer_stars = 2 THEN 1 END) as customer_two_star,
-        COUNT(CASE WHEN customer_stars = 1 THEN 1 END) as customer_one_star
-       FROM rideshare_trips 
-       WHERE driver_stars IS NOT NULL OR customer_stars IS NOT NULL`,
+        AVG(driver_rates_customer) as average_driver_rating,
+        AVG(customer_rates_driver) as average_customer_rating,
+        COUNT(CASE WHEN driver_rates_customer = 5 THEN 1 END) as driver_five_star,
+        COUNT(CASE WHEN driver_rates_customer = 4 THEN 1 END) as driver_four_star,
+        COUNT(CASE WHEN driver_rates_customer = 3 THEN 1 END) as driver_three_star,
+        COUNT(CASE WHEN driver_rates_customer = 2 THEN 1 END) as driver_two_star,
+        COUNT(CASE WHEN driver_rates_customer = 1 THEN 1 END) as driver_one_star,
+        COUNT(CASE WHEN customer_rates_driver = 5 THEN 1 END) as customer_five_star,
+        COUNT(CASE WHEN customer_rates_driver = 4 THEN 1 END) as customer_four_star,
+        COUNT(CASE WHEN customer_rates_driver = 3 THEN 1 END) as customer_three_star,
+        COUNT(CASE WHEN customer_rates_driver = 2 THEN 1 END) as customer_two_star,
+        COUNT(CASE WHEN customer_rates_driver = 1 THEN 1 END) as customer_one_star
+       FROM rideshare_requests 
+       WHERE driver_rates_customer IS NOT NULL OR customer_rates_driver IS NOT NULL`,
       (err, results) => {
         if (err) return reject(err);
         resolve(results[0]);

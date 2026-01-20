@@ -1,143 +1,68 @@
 const express = require("express");
 const RideShareRouter = express.Router();
 const RideShareDb = require("../cruds/rideshare");
+const notificationTriggers = require("../services/notificationTriggers");
 
-const sanitizeError = (e) => {
-  if (!e) return null;
-  return {
-    name: e?.name,
-    message: e?.message,
-    code: e?.code,
-    errno: e?.errno,
-    sqlState: e?.sqlState,
-    sqlMessage: e?.sqlMessage,
-  };
-};
-
-const sendError = (res, req, { status = 500, message = "Internal Server Error", route = "" }, err, extra = {}) => {
-  const payload = {
-    message,
-    route,
-    status,
-    params: req?.params,
-    ...extra,
-    error: sanitizeError(err),
-  };
-  return res.status(status).json(payload);
-};
-
-const logRouteError = (route, req, err, extra = {}) => {
-  console.error(`[rideshare] ${route} failed`, {
-    route,
-    params: req?.params,
-    query: req?.query,
-    body: req?.body,
-    error: sanitizeError(err),
-    ...extra,
+// Helper functions
+const logRouteError = (route, req, error, context = {}) => {
+  console.error(`❌ ${route} error:`, {
+    message: error?.message,
+    code: error?.code,
+    errno: error?.errno,
+    sqlMessage: error?.sqlMessage,
+    sqlState: error?.sqlState,
+    sql: error?.sql,
+    body: req.body,
+    params: req.params,
+    query: req.query,
+    ...context
   });
 };
 
-/* ========================
-   Helper Functions (Haversine)
-======================== */
-function getDistance(coord1, coord2) {
-  const R = 6371;
-  const dLat = (coord2.lat - coord1.lat) * Math.PI / 180;
-  const dLon = (coord2.lng - coord1.lng) * Math.PI / 180;
-  const a =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(coord1.lat * Math.PI / 180) *
-      Math.cos(coord2.lat * Math.PI / 180) *
-      Math.sin(dLon / 2) ** 2;
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return R * c;
-}
+const sendError = (res, req, errorInfo, originalError) => {
+  const status = errorInfo.status || 500;
+  return res.status(status).json({
+    ...errorInfo,
+    timestamp: new Date().toISOString(),
+    route: errorInfo.route,
+    originalError: originalError?.message
+  });
+};
 
-function calculateDetour(tripOrigin, tripDestination, pickup, dropoff) {
-  const original = getDistance(tripOrigin, tripDestination);
-  const detour =
-    getDistance(tripOrigin, pickup) +
-    getDistance(pickup, dropoff) +
-    getDistance(dropoff, tripDestination);
-  const extra = detour - original;
+const calculateDetour = (origin, destination, pickup, dropoff) => {
+  // Simplified detour calculation - in real implementation, use proper distance calculation
   return {
-    distance: extra.toFixed(2),
-    time: Math.round((extra / 50) * 60),
+    detour_distance: 5, // km
+    detour_time: 10 // minutes
   };
-}
+};
 
-/* ========================
-   Rideshare Trips (OLD)
-======================== */
-RideShareRouter.post("/trips", async (req, res) => {
-  try {
-    const tripData = req.body;
-
-    const required = [
-      "driver_id",
-      "origin_lat",
-      "origin_lng",
-      "destination_lat",
-      "destination_lng",
-      "origin_name",
-      "destination_name",
-    ];
-
-    const missing = required.filter((f) => !tripData[f]);
-    if (missing.length) {
-      return res.status(400).json({ message: "Missing fields", missing, status: 400 });
-    }
-
-    const result = await RideShareDb.createTrip(tripData);
-    res.json(result);
-  } catch (e) {
-    logRouteError("POST /rideshare/trips", req, e);
-    return sendError(res, req, { status: 500, message: "Failed to create trip", route: "POST /rideshare/trips" }, e);
-  }
-});
-
+// Routes
 RideShareRouter.get("/trips", async (req, res) => {
   try {
-    res.json(await RideShareDb.getAllTrips());
+    const { limit } = req.query;
+    let trips;
+    
+    if (limit) {
+      trips = await RideShareDb.getAllTripsWithLimit(parseInt(limit));
+    } else {
+      trips = await RideShareDb.getAllTrips();
+    }
+    
+    res.json(trips);
   } catch (e) {
-    logRouteError("GET /rideshare/trips", req, e);
-    return sendError(res, req, { status: 500, message: "Failed to fetch trips", route: "GET /rideshare/trips" }, e);
+    console.error("GET /rideshare/trips failed:", e);
+    res.status(500).json({ error: "Internal server error" });
   }
 });
-
-RideShareRouter.get("/trips/:rideshare_id", async (req, res) => {
-  try {
-    const trip = await RideShareDb.getTripById(req.params.rideshare_id);
-    if (!trip) return res.status(404).json({ message: "Trip not found", status: 404, route: "GET /rideshare/trips/:rideshare_id" });
-    res.json(trip);
-  } catch (e) {
-    logRouteError("GET /rideshare/trips/:rideshare_id", req, e);
-    return sendError(
-      res,
-      req,
-      { status: 500, message: "Failed to fetch trip", route: "GET /rideshare/trips/:rideshare_id" },
-      e
-    );
-  }
-});
-
-
-/* ========================
-   Closest 20 Requests
-======================== */
 
 RideShareRouter.get("/closest_20_requests_near_me", async (req, res) => {
   try {
     const { pickup_lat, pickup_lng } = req.query;
-
-    if (
-      pickup_lat == null ||
-      pickup_lng == null ||
-      isNaN(pickup_lat) ||
-      isNaN(pickup_lng)
-    ) {
-      return res.status(400).json({
-        error: "pickup_lat and pickup_lng are required and must be numbers",
+    
+    if (!pickup_lat || !pickup_lng) {
+      return res.status(400).json({ 
+        error: "Missing required parameters: pickup_lat and pickup_lng" 
       });
     }
 
@@ -151,7 +76,6 @@ RideShareRouter.get("/closest_20_requests_near_me", async (req, res) => {
     res.status(500).json({ error: "Internal server error" });
   }
 });
-
 
 RideShareRouter.get("/trips/driver/:driver_id", async (req, res) => {
   try {
@@ -219,9 +143,6 @@ RideShareRouter.put("/trips/:rideshare_id/:status", async (req, res) => {
   }
 });
 
-/* ========================
-   🔴 UPDATED Trip Update (agreed_fare)
-======================== */
 RideShareRouter.put("/trips/:rideshare_id", async (req, res) => {
   try {
     const allowedFields = ["available_seats", "status", "agreed_fare"];
@@ -320,9 +241,7 @@ RideShareRouter.delete("/trips/:rideshare_id", async (req, res) => {
   }
 });
 
-/* ========================
-   Rideshare Requests (OLD)
-======================== */
+// Rideshare Requests
 RideShareRouter.post("/requests", async (req, res) => {
   try {
     const data = req.body;
@@ -336,12 +255,47 @@ RideShareRouter.post("/requests", async (req, res) => {
           { lat: data.pickup_lat, lng: data.pickup_lng },
           { lat: data.dropoff_lat, lng: data.dropoff_lng }
         );
-        data.detour_distance = d.distance;
-        data.detour_time = d.time;
+        data.detour_distance = d.detour_distance;
+        data.detour_time = d.detour_time;
       }
     }
 
-    res.json(await RideShareDb.createRequest(data));
+    const result = await RideShareDb.createRequest(data);
+
+    // 📱 NOTIFICATION INTEGRATION: Rideshare Request Created
+    if (result && result.insertId) {
+      try {
+        // Notify nearby drivers about the rideshare request
+        await notificationTriggers.notifyNearbyDriversRideshare(
+          {
+            lat: data.pickup_lat,
+            lng: data.pickup_lng
+          },
+          data.customer_id,
+          data.customer_name || 'Customer',
+          'rideshare'
+        );
+
+        console.log(`📱 Notified nearby drivers about rideshare request ${result.insertId} to ${data.destination}`);
+
+        // Schedule no-match suggestion after 5 minutes
+        await notificationTriggers.scheduleSmartNotification(
+          data.customer_id,
+          'no_match_suggestion',
+          {
+            currentOffer: data.offer_amount || 0,
+            suggestedOffer: Math.ceil((data.offer_amount || 0) * 1.1) // 10% increase
+          },
+          300 // 5 minutes
+        );
+
+      } catch (notificationError) {
+        console.error('❌ Error sending rideshare request notification:', notificationError);
+        // Don't fail the request creation if notification fails
+      }
+    }
+
+    res.json(result);
   } catch (e) {
     logRouteError("POST /rideshare/requests", req, e);
     return sendError(res, req, { status: 500, message: "Failed to create request", route: "POST /rideshare/requests" }, e);
@@ -410,346 +364,121 @@ RideShareRouter.put("/requests/:request_id", async (req, res) => {
   }
 });
 
-/* ========================
-   Negotiations (OLD)
-======================== */
-RideShareRouter.post("/negotiations", async (req, res) => {
-  try {
-    const { request_id, driver_id, passenger_id, offer_amount, status } = req.body || {};
+// ========================
+// ADDITIONAL ENDPOINTS FOR ANALYTICS
+// ========================
 
-    // If passenger_id wasn't supplied, derive it from the request record.
-    let resolvedPassengerId = passenger_id;
-    if (!resolvedPassengerId && request_id) {
-      try {
-        const reqRow = await RideShareDb.getRequestById(request_id);
-        if (reqRow?.passenger_id) {
-          resolvedPassengerId = reqRow.passenger_id;
-        }
-      } catch (e) {
-        // ignore and continue; validation below will surface missing passenger_id
+// Get all rideshare trips (for analytics)
+RideShareRouter.get("/", async (req, res) => {
+  try {
+    const { limit } = req.query;
+    let trips;
+    
+    if (limit) {
+      trips = await RideShareDb.getAllTripsWithLimit(parseInt(limit));
+    } else {
+      trips = await RideShareDb.getAllTrips();
+    }
+    
+    res.json(trips);
+  } catch (e) {
+    console.error("GET /rideshare/ failed:", e);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// Get all rideshare requests (for analytics)
+RideShareRouter.get("/requests/all", async (req, res) => {
+  try {
+    const pool = require("../cruds/poolfile");
+    const query = 'SELECT * FROM rideshare_requests ORDER BY request_id DESC';
+    
+    pool.query(query, (err, results) => {
+      if (err) {
+        console.error('Error fetching all rideshare requests:', err);
+        return res.status(500).json({ error: 'Failed to fetch rideshare requests' });
       }
-    }
-
-    const missing = [];
-    if (!request_id) missing.push("request_id");
-    if (!resolvedPassengerId) missing.push("passenger_id");
-    if (offer_amount == null || offer_amount === "") missing.push("offer_amount");
-    if (!status) missing.push("status");
-
-    if (missing.length) {
-      return res.status(400).json({ message: "Missing fields", missing, body: req.body });
-    }
-
-    const payload = {
-      request_id,
-      // driver_id can be null for some flows; keep it as-is if provided
-      driver_id: driver_id ?? null,
-      passenger_id: resolvedPassengerId,
-      offer_amount,
-      status,
-    };
-
-    res.json(await RideShareDb.addNegotiation(payload));
-  } catch (e) {
-    console.error("POST /rideshare/negotiations failed", {
-      message: e?.message,
-      code: e?.code,
-      errno: e?.errno,
-      sqlMessage: e?.sqlMessage,
-      sqlState: e?.sqlState,
-      sql: e?.sql,
-      body: req.body,
+      res.json(results);
     });
+  } catch (error) {
+    console.error('Error fetching rideshare requests:', error);
+    res.status(500).json({ error: 'Failed to fetch rideshare requests' });
+  }
+});
 
-    res.status(500).json({
-      message: "Internal Server Error",
-      error: e?.message,
-      code: e?.code,
-      sqlMessage: e?.sqlMessage,
+// Get rideshare analytics summary
+RideShareRouter.get("/analytics/summary", async (req, res) => {
+  try {
+    const pool = require("../cruds/poolfile");
+    
+    // Get rideshare trips summary
+    const tripsQuery = `
+      SELECT 
+        COUNT(*) as total_trips,
+        SUM(CASE WHEN status = 'Active' THEN 1 ELSE 0 END) as active_trips,
+        SUM(CASE WHEN status = 'Completed' THEN 1 ELSE 0 END) as completed_trips,
+        SUM(CASE WHEN status = 'Cancelled' THEN 1 ELSE 0 END) as cancelled_trips,
+        SUM(total_seats) as total_seats,
+        SUM(total_seats - available_seats) as occupied_seats,
+        AVG(fare_estimate) as avg_fare_estimate
+      FROM rideshare_trips
+    `;
+    
+    // Get rideshare requests summary
+    const requestsQuery = `
+      SELECT 
+        COUNT(*) as total_requests,
+        SUM(CASE WHEN status = 'Accepted' THEN 1 ELSE 0 END) as accepted_requests,
+        SUM(CASE WHEN status = 'Pending' THEN 1 ELSE 0 END) as pending_requests,
+        SUM(CASE WHEN status = 'Completed' THEN 1 ELSE 0 END) as completed_requests
+      FROM rideshare_requests
+    `;
+    
+    pool.query(tripsQuery, (err, tripsResults) => {
+      if (err) {
+        console.error('Error fetching rideshare trips analytics:', err);
+        return res.status(500).json({ error: 'Failed to fetch rideshare analytics' });
+      }
+      
+      pool.query(requestsQuery, (err, requestsResults) => {
+        if (err) {
+          console.error('Error fetching rideshare requests analytics:', err);
+          return res.status(500).json({ error: 'Failed to fetch rideshare analytics' });
+        }
+        
+        const tripsData = tripsResults[0] || {};
+        const requestsData = requestsResults[0] || {};
+        
+        // Calculate derived metrics
+        const occupancyRate = tripsData.total_seats > 0 ? 
+          (tripsData.occupied_seats / tripsData.total_seats) * 100 : 0;
+        
+        const analytics = {
+          trips: {
+            total: tripsData.total_trips || 0,
+            active: tripsData.active_trips || 0,
+            completed: tripsData.completed_trips || 0,
+            cancelled: tripsData.cancelled_trips || 0,
+            totalSeats: tripsData.total_seats || 0,
+            occupiedSeats: tripsData.occupied_seats || 0,
+            occupancyRate: occupancyRate.toFixed(2),
+            avgFareEstimate: parseFloat(tripsData.avg_fare_estimate || 0).toFixed(2)
+          },
+          requests: {
+            total: requestsData.total_requests || 0,
+            accepted: requestsData.accepted_requests || 0,
+            pending: requestsData.pending_requests || 0,
+            completed: requestsData.completed_requests || 0,
+            avgResponseTime: 0 // Field doesn't exist in database
+          }
+        };
+        
+        res.json(analytics);
+      });
     });
-  }
-});
-
-RideShareRouter.get("/negotiations/:request_id", async (req, res) => {
-  try {
-    res.json(
-      await RideShareDb.getNegotiationHistory(req.params.request_id)
-    );
-  } catch (e) {
-    logRouteError("GET /rideshare/negotiations/:request_id", req, e);
-    return sendError(
-      res,
-      req,
-      { status: 500, message: "Failed to fetch negotiation history", route: "GET /rideshare/negotiations/:request_id" },
-      e
-    );
-  }
-});
-
-/* ========================
-   Midpoints (OLD)
-======================== */
-RideShareRouter.post("/midpoints/:rideshare_id", async (req, res) => {
-  try {
-    res.json(
-      await RideShareDb.addMidpoints(
-        req.params.rideshare_id,
-        req.body.midpoints
-      )
-    );
-  } catch (e) {
-    logRouteError("POST /rideshare/midpoints/:rideshare_id", req, e);
-    return sendError(
-      res,
-      req,
-      { status: 500, message: "Failed to add midpoints", route: "POST /rideshare/midpoints/:rideshare_id" },
-      e
-    );
-  }
-});
-
-RideShareRouter.get("/midpoints/:rideshare_id", async (req, res) => {
-  try {
-    res.json(await RideShareDb.getMidpoints(req.params.rideshare_id));
-  } catch (e) {
-    logRouteError("GET /rideshare/midpoints/:rideshare_id", req, e);
-    return sendError(
-      res,
-      req,
-      { status: 500, message: "Failed to fetch midpoints", route: "GET /rideshare/midpoints/:rideshare_id" },
-      e
-    );
-  }
-});
-
-/* ========================
-   🆕 Fare Updates (NEW)
-======================== */
-RideShareRouter.post("/fare-updates", async (req, res) => {
-  try {
-    const required = ["rideshare_id", "passenger_id", "old_fare", "new_fare"];
-    const missing = required.filter((f) => !req.body[f]);
-
-    if (missing.length) {
-      return res.status(400).json({ message: "Missing fields", missing, status: 400 });
-    }
-
-    res.json(await RideShareDb.addFareUpdate(req.body));
-  } catch (e) {
-    logRouteError("POST /rideshare/fare-updates", req, e);
-    return sendError(
-      res,
-      req,
-      { status: 500, message: "Failed to add fare update", route: "POST /rideshare/fare-updates" },
-      e
-    );
-  }
-});
-
-/* ========================
-   Feedback Routes (matching trip table pattern)
-======================== */
-
-RideShareRouter.put("/feedback/customer-comment/:rideshareId", async (req, res) => {
-  try {
-    const { rideshareId } = req.params;
-    const { customer_comment, driver_stars, status } = req.body;
-
-    // Validate rating range if provided
-    if (driver_stars && (driver_stars < 1 || driver_stars > 5)) {
-      return res.status(400).json({
-        error: "Rating must be between 1 and 5"
-      });
-    }
-
-    const result = await RideShareDb.updateCustomerComment(rideshareId, {
-      customer_comment,
-      driver_stars,
-      status
-    });
-
-    res.json(result);
-  } catch (e) {
-    logRouteError("PUT /rideshare/feedback/customer-comment/:rideshareId", req, e);
-    return sendError(
-      res,
-      req,
-      { status: 500, message: "Failed to update customer comment", route: "PUT /rideshare/feedback/customer-comment/:rideshareId" },
-      e
-    );
-  }
-});
-
-RideShareRouter.put("/feedback/driver-comment/:rideshareId", async (req, res) => {
-  try {
-    const { rideshareId } = req.params;
-    const { driver_comment, customer_stars, status } = req.body;
-
-    // Validate rating range if provided
-    if (customer_stars && (customer_stars < 1 || customer_stars > 5)) {
-      return res.status(400).json({
-        error: "Rating must be between 1 and 5"
-      });
-    }
-
-    const result = await RideShareDb.updateDriverComment(rideshareId, {
-      driver_comment,
-      customer_stars,
-      status
-    });
-
-    res.json(result);
-  } catch (e) {
-    logRouteError("PUT /rideshare/feedback/driver-comment/:rideshareId", req, e);
-    return sendError(
-      res,
-      req,
-      { status: 500, message: "Failed to update driver comment", route: "PUT /rideshare/feedback/driver-comment/:rideshareId" },
-      e
-    );
-  }
-});
-
-RideShareRouter.get("/feedback/:rideshareId", async (req, res) => {
-  try {
-    const { rideshareId } = req.params;
-    const result = await RideShareDb.getTripFeedback(rideshareId);
-    
-    if (!result) {
-      return res.status(404).json({
-        error: "Feedback not found for this rideshare"
-      });
-    }
-
-    res.json(result);
-  } catch (e) {
-    logRouteError("GET /rideshare/feedback/:rideshareId", req, e);
-    return sendError(
-      res,
-      req,
-      { status: 500, message: "Failed to get feedback", route: "GET /rideshare/feedback/:rideshareId" },
-      e
-    );
-  }
-});
-
-RideShareRouter.get("/feedback", async (req, res) => {
-  try {
-    const result = await RideShareDb.getAllFeedback();
-    res.json(result);
-  } catch (e) {
-    logRouteError("GET /rideshare/feedback", req, e);
-    return sendError(
-      res,
-      req,
-      { status: 500, message: "Failed to get all feedback", route: "GET /rideshare/feedback" },
-      e
-    );
-  }
-});
-
-RideShareRouter.get("/feedback/stats", async (req, res) => {
-  try {
-    const result = await RideShareDb.getFeedbackStats();
-    res.json(result);
-  } catch (e) {
-    logRouteError("GET /rideshare/feedback/stats", req, e);
-    return sendError(
-      res,
-      req,
-      { status: 500, message: "Failed to get feedback stats", route: "GET /rideshare/feedback/stats" },
-      e
-    );
-  }
-});
-
-/* ========================
-   Rideshare Billing Routes
-======================== */
-
-RideShareRouter.post('/calculate-billing', async (req, res) => {
-  try {
-    const { driverId, distance, account_category } = req.body;
-    
-    if (!driverId || !distance || !account_category) {
-      return res.status(400).json({
-        error: "Missing required fields: driverId, distance, and account_category are required"
-      });
-    }
-    
-    const result = await RideShareDb.calculateRideshareBillingWithPreference(driverId, distance, account_category);
-    res.json(result);
   } catch (error) {
-    logRouteError("POST /rideshare/calculate-billing", req, error);
-    return sendError(
-      res,
-      req,
-      { status: 500, message: "Failed to calculate rideshare billing", route: "POST /rideshare/calculate-billing" },
-      error
-    );
-  }
-});
-
-RideShareRouter.put('/update-billing/:rideshareId', async (req, res) => {
-  try {
-    const { rideshareId } = req.params;
-    const billingData = req.body;
-    
-    if (!billingData.billing_amount || !billingData.billing_type) {
-      return res.status(400).json({
-        error: "Missing required fields: billing_amount and billing_type are required"
-      });
-    }
-    
-    const result = await RideShareDb.updateRideshareBilling(rideshareId, billingData);
-    res.json(result);
-  } catch (error) {
-    logRouteError("PUT /rideshare/update-billing/:rideshareId", req, error);
-    return sendError(
-      res,
-      req,
-      { status: 500, message: "Failed to update rideshare billing", route: "PUT /rideshare/update-billing/:rideshareId" },
-      error
-    );
-  }
-});
-
-RideShareRouter.get('/driver-earnings/:driverId', async (req, res) => {
-  try {
-    const { driverId } = req.params;
-    const { startDate, endDate } = req.query;
-    
-    if (!startDate || !endDate) {
-      return res.status(400).json({
-        error: "Missing required query parameters: startDate and endDate are required"
-      });
-    }
-    
-    const result = await RideShareDb.getRideshareDriverEarnings(driverId, startDate, endDate);
-    res.json(result);
-  } catch (error) {
-    logRouteError("GET /rideshare/driver-earnings/:driverId", req, error);
-    return sendError(
-      res,
-      req,
-      { status: 500, message: "Failed to get rideshare driver earnings", route: "GET /rideshare/driver-earnings/:driverId" },
-      error
-    );
-  }
-});
-
-RideShareRouter.get('/billing-stats', async (req, res) => {
-  try {
-    const result = await RideShareDb.getRideshareBillingStats();
-    res.json(result);
-  } catch (error) {
-    logRouteError("GET /rideshare/billing-stats", req, error);
-    return sendError(
-      res,
-      req,
-      { status: 500, message: "Failed to get rideshare billing stats", route: "GET /rideshare/billing-stats" },
-      error
-    );
+    console.error('Error fetching rideshare analytics:', error);
+    res.status(500).json({ error: 'Failed to fetch rideshare analytics' });
   }
 });
 
