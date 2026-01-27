@@ -213,10 +213,14 @@ crudsObj.createRequest = (requestData) =>
       dropoff_lat,
       dropoff_lng,
       fare_offer,
+      offer_amount,
       detour_distance,
       detour_time,
       status = "Join Shared Ride Request",
     } = requestData;
+
+    // Use offer_amount if provided, otherwise fallback to fare_offer
+    const finalOfferAmount = offer_amount || fare_offer || 0;
 
     const finalDetour = detour_distance && detour_time ? { detour_distance, detour_time } : await (() => {
       return new Promise(async (res) => {
@@ -234,8 +238,8 @@ crudsObj.createRequest = (requestData) =>
     pool.query(
       `INSERT INTO rideshare_requests (
         rideshare_id, passenger_id, pickup_lat, pickup_lng, dropoff_lat, dropoff_lng,
-        fare_offer, detour_distance, detour_time, status
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        offer_amount, fare_offer, detour_distance, detour_time, status
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         rideshare_id,
         passenger_id,
@@ -243,7 +247,8 @@ crudsObj.createRequest = (requestData) =>
         pickup_lng,
         dropoff_lat,
         dropoff_lng,
-        fare_offer,
+        finalOfferAmount,
+        finalOfferAmount, // Store in both fields for backwards compatibility
         finalDetour.detour_distance,
         finalDetour.detour_time,
         status,
@@ -275,6 +280,14 @@ crudsObj.getRequestsByTrip = (rideshare_id) =>
      );
    });
 
+crudsObj.getAllRequests = () =>
+  new Promise((resolve, reject) => {
+    pool.query("SELECT * FROM rideshare_requests ORDER BY request_id DESC", (err, results) => {
+      if (err) return reject(err);
+      resolve(results);
+    });
+  });
+
 crudsObj.getRequestById = (request_id) =>
   new Promise((resolve, reject) => {
     pool.query("SELECT * FROM rideshare_requests WHERE request_id = ?", [request_id], (err, results) => {
@@ -286,12 +299,21 @@ crudsObj.getRequestById = (request_id) =>
 crudsObj.updateRequest = (request_id, updatedData) =>
   new Promise((resolve, reject) => {
     const { status, fare_offer } = updatedData;
+    
+    console.log(`[CRUD] updateRequest - ID: ${request_id}, Status: ${status}, Fare: ${fare_offer}`);
+    
     pool.query(
       "UPDATE rideshare_requests SET status = ?, fare_offer = ? WHERE request_id = ?",
       [status, fare_offer, request_id],
-      (err) => {
-        if (err) return reject(err);
-        resolve({ status: 200, message: "Request updated" });
+      (err, result) => {
+        if (err) {
+          console.error(`[CRUD] updateRequest - Error:`, err);
+          return reject(err);
+        }
+        
+        console.log(`[CRUD] updateRequest - Success: ${result.affectedRows} rows affected`);
+        
+        resolve({ status: 200, message: "Request updated", affectedRows: result.affectedRows });
       }
     );
   });
@@ -314,34 +336,145 @@ crudsObj.updateRequestsByTripStatus = (rideshare_id, status) =>
 crudsObj.addNegotiation = (negotiationData) =>
   new Promise((resolve, reject) => {
     const { request_id, driver_id, passenger_id, offer_amount, status } = negotiationData;
-    const driverIdVal = driver_id == null || driver_id === "" ? null : String(driver_id);
-    const passengerIdVal = passenger_id == null || passenger_id === "" ? null : String(passenger_id);
     const offerNum = typeof offer_amount === "number" ? offer_amount : parseFloat(String(offer_amount));
 
     if (!Number.isFinite(offerNum)) {
       return reject(new Error("Invalid offer_amount"));
     }
 
+    // Determine offer_type and set IDs accordingly
+    // Only ONE of driver_id or passenger_id should be set per record
+    let offerType, finalDriverId, finalPassengerId;
+    
+    if (driver_id != null && driver_id !== "") {
+      // Driver sent this offer
+      offerType = 'driver';
+      finalDriverId = String(driver_id);
+      finalPassengerId = null; // Passenger ID should be NULL for driver offers
+    } else {
+      // Passenger sent this offer
+      offerType = 'passenger';
+      finalDriverId = null; // Driver ID should be NULL for passenger offers
+      finalPassengerId = passenger_id == null || passenger_id === "" ? null : String(passenger_id);
+    }
+
+    // First, mark any previous 'Pending' records as 'Counter Offer' 
+    // This shows the previous offer was responded to
     pool.query(
-      `INSERT INTO rideshare_negotiation_history
-        (request_id, driver_id, passenger_id, offer_amount, status)
-       VALUES (?, ?, ?, ?, ?)`,
-      [request_id, driverIdVal, passengerIdVal, offerNum, status],
+      `UPDATE rideshare_negotiation_history 
+       SET status = 'Counter Offer' 
+       WHERE request_id = ? AND status = 'Pending'`,
+      [request_id],
+      (updateErr) => {
+        if (updateErr) {
+          console.error("Error updating previous pending offers:", updateErr);
+          // Continue anyway - not critical
+        }
+        
+        // Now insert the new negotiation record with 'Pending' status and offer_type
+        pool.query(
+          `INSERT INTO rideshare_negotiation_history
+            (request_id, driver_id, passenger_id, offer_type, offer_amount, status)
+           VALUES (?, ?, ?, ?, ?, 'Pending')`,
+          [request_id, finalDriverId, finalPassengerId, offerType, offerNum],
+          (err) => {
+            if (err) return reject(err);
+            resolve({ status: 200, message: "Negotiation logged" });
+          }
+        );
+      }
+    );
+  });
+
+// Add to rideshare.js cruds
+crudsObj.markBidAsViewed = (request_id, driver_id) =>
+  new Promise((resolve, reject) => {
+    // Mark negotiation as viewed with timestamp
+    pool.query(
+      `UPDATE rideshare_negotiation_history 
+       SET viewed_at = CURRENT_TIMESTAMP, status = 'Viewed'
+       WHERE request_id = ? AND driver_id = ? AND status IN ('Pending', 'Active')`,
+      [request_id, driver_id],
       (err) => {
         if (err) return reject(err);
-        resolve({ status: 200, message: "Negotiation logged" });
+        resolve({ status: 200, message: "Bid marked as viewed" });
+      }
+    );
+  });
+
+crudsObj.checkBidExpiration = (request_id) =>
+  new Promise((resolve, reject) => {
+    // Check if any viewed bids have expired (2 minutes)
+    pool.query(
+      `UPDATE rideshare_negotiation_history 
+       SET status = 'Expired'
+       WHERE request_id = ? 
+       AND status = 'Viewed' 
+       AND viewed_at < DATE_SUB(NOW(), INTERVAL 2 MINUTE)`,
+      [request_id],
+      (err) => {
+        if (err) return reject(err);
+        resolve({ status: 200, message: "Expired bids updated" });
+      }
+    );
+  });
+
+crudsObj.checkRequestExpiration = () =>
+  new Promise((resolve, reject) => {
+    // Auto-expire requests older than 15 minutes with no accepted bids
+    pool.query(
+      `UPDATE rideshare_requests r
+       SET r.status = 'Expired'
+       WHERE r.status IN ('Negotiating', 'Join Shared Ride Request')
+       AND r.created_at < DATE_SUB(NOW(), INTERVAL 15 MINUTE)
+       AND NOT EXISTS (
+         SELECT 1 FROM rideshare_requests r2 
+         WHERE r2.rideshare_id = r.rideshare_id 
+         AND r2.status = 'Accepted'
+       )`,
+      (err) => {
+        if (err) return reject(err);
+        resolve({ status: 200, message: "Old requests expired" });
       }
     );
   });
 
 crudsObj.getNegotiationHistory = (request_id) =>
   new Promise((resolve, reject) => {
+    const { isExpired } = require('../utils/timezone');
+    
     pool.query(
       "SELECT * FROM rideshare_negotiation_history WHERE request_id = ? ORDER BY created_at ASC",
       [request_id],
       (err, results) => {
         if (err) return reject(err);
-        resolve(results);
+        
+        // Auto-expire ONLY 'Pending' status records older than 5 minutes
+        // 'Counter Offer' and other statuses do NOT expire
+        results.forEach(item => {
+          if (item.status === 'Pending' && item.created_at) {
+            const entryExpired = isExpired(item.created_at, 5);
+            
+            if (entryExpired) {
+              // Mark this pending offer as expired
+              pool.query(
+                "UPDATE rideshare_negotiation_history SET status = 'Expired' WHERE id = ?",
+                [item.id],
+                (updateErr) => {
+                  if (updateErr) {
+                    console.error("Error marking negotiation entry as expired:", updateErr);
+                  }
+                }
+              );
+              // Update the item in results array for immediate display
+              item.status = 'Expired';
+            }
+          }
+        });
+        
+        // Return all negotiation records for this request_id
+        // Show complete negotiation timeline including expired offers
+        resolve(results || []);
       }
     );
   });
@@ -683,6 +816,73 @@ crudsObj.getRideshareBillingStats = () => {
       AND status = 'Completed'
       GROUP BY billing_type
       ORDER BY trip_count DESC
+    `;
+    
+    pool.query(query, (err, results) => {
+      if (err) return reject(err);
+      resolve(results);
+    });
+  });
+};
+
+// NEW: Get all active rideshare requests (negotiated and expired)
+crudsObj.getAllActiveRideshareRequests = () => {
+  return new Promise((resolve, reject) => {
+    const query = `
+      SELECT * FROM rideshare_requests 
+      WHERE status IN ('Join Shared Ride Request', 'Negotiating')
+      ORDER BY created_at DESC
+    `;
+    
+    pool.query(query, (err, results) => {
+      if (err) return reject(err);
+      resolve(results);
+    });
+  });
+};
+
+// NEW: Control panel settings CRUD operations
+crudsObj.getControlPanelSetting = (settingKey) => {
+  return new Promise((resolve, reject) => {
+    const query = `
+      SELECT setting_value, setting_type 
+      FROM control_panel_settings 
+      WHERE setting_key = ?
+    `;
+    
+    pool.query(query, [settingKey], (err, results) => {
+      if (err) return reject(err);
+      if (results.length === 0) {
+        return resolve(null); // Setting not found
+      }
+      resolve(results[0]);
+    });
+  });
+};
+
+crudsObj.updateControlPanelSetting = (settingKey, settingValue, settingType = 'string', description = null) => {
+  return new Promise((resolve, reject) => {
+    const query = `
+      INSERT INTO control_panel_settings (setting_key, setting_value, setting_type, description) 
+      VALUES (?, ?, ?, ?)
+      ON DUPLICATE KEY UPDATE 
+      setting_value = VALUES(setting_value),
+      updated_at = CURRENT_TIMESTAMP
+    `;
+    
+    pool.query(query, [settingKey, settingValue, settingType, description], (err, results) => {
+      if (err) return reject(err);
+      resolve(results);
+    });
+  });
+};
+
+crudsObj.getAllControlPanelSettings = () => {
+  return new Promise((resolve, reject) => {
+    const query = `
+      SELECT setting_key, setting_value, setting_type, description, updated_at
+      FROM control_panel_settings 
+      ORDER BY setting_key
     `;
     
     pool.query(query, (err, results) => {

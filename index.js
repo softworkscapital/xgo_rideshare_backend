@@ -57,6 +57,9 @@ const RideMatchingSettingsRouter = require("./routes/ride_matching_settings");
 const CustomerPerformanceRouter = require("./routes/customer_performance");
 const DriverEarningsRouter = require("./routes/driver_earnings");
 
+// Add commission settings routes
+const CommissionSettingsRouter = require("./routes/commissionSettings");
+
 const pool = require("./cruds/poolfile");
 const bodyParser = require("body-parser");
 
@@ -136,6 +139,68 @@ app.use("/rideshare", rideshareRouter);
 app.use("/commission/analytics/customers-performance", CustomerPerformanceRouter);
 app.use("/commission/analytics/drivers-summary", DriverEarningsRouter);
 app.use("/commission/earnings", DriverEarningsRouter);
+
+// Add commission settings routes
+app.use("/commission", CommissionSettingsRouter);
+
+// Add control panel settings endpoints using database
+app.get("/control-panel/settings", async (req, res) => {
+  try {
+    const RideShareDb = require("./cruds/rideshare");
+    
+    // Get the nearby requests radius setting
+    const radiusSetting = await RideShareDb.getControlPanelSetting('nearby_requests_radius_km');
+    
+    let nearbyRadius = 5.0; // Default value
+    if (radiusSetting) {
+      nearbyRadius = parseFloat(radiusSetting.setting_value);
+    }
+    
+    res.json({
+      nearby_requests_radius_km: nearbyRadius
+    });
+  } catch (error) {
+    console.error('Error fetching control panel settings:', error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch settings",
+      error: error.message
+    });
+  }
+});
+
+app.post("/control-panel/settings", async (req, res) => {
+  try {
+    const { nearby_requests_radius_km } = req.body;
+    const RideShareDb = require("./cruds/rideshare");
+    
+    console.log(`[Control Panel POST] Received request to update radius to: ${nearby_requests_radius_km}`);
+    
+    // Update the nearby requests radius setting in database
+    const result = await RideShareDb.updateControlPanelSetting(
+      'nearby_requests_radius_km', 
+      nearby_requests_radius_km || 5.0, 
+      'decimal', 
+      'Radius in km for showing nearby passenger requests to drivers'
+    );
+    
+    console.log(`[Control Panel POST] Database update result:`, result);
+    console.log(`[Control Panel POST] Successfully updated nearby_requests_radius_km to: ${nearby_requests_radius_km || 5.0}`);
+    
+    res.json({
+      success: true,
+      message: "Settings saved successfully",
+      nearby_requests_radius_km: nearby_requests_radius_km || 5.0
+    });
+  } catch (error) {
+    console.error('[Control Panel POST] Error saving control panel settings:', error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to save settings",
+      error: error.message
+    });
+  }
+});
 
 // Add notification routes
 const NotificationRouter = require("./routes/notifications");

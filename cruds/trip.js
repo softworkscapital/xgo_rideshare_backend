@@ -1080,10 +1080,10 @@ crudsObj.updateStatusAndDriver = (trip_id, driver_id, status) => {
           return reject(err); // Reject if there's an error
         }
 
-        // Calculate the updated date
-        const currentDate = new Date();
-        currentDate.setHours(currentDate.getHours() + 2); // Add 2 hours
-        const formattedDate = currentDate.toISOString().slice(0, 19).replace('T', ' '); // Format the date
+        // Get current UTC time for database
+        const { getCurrentUTC } = require('../utils/timezone');
+        const currentUTC = getCurrentUTC();
+        const formattedDate = currentUTC.toISOString().slice(0, 19).replace('T', ' ');
 
         // Third query: Update users table
         const updateUserQuery = `

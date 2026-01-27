@@ -18,10 +18,10 @@ ADD COLUMN IF NOT EXISTS current_detour_distance DECIMAL(5,2) DEFAULT 3.0 COMMEN
 -- Insert default detour distance settings
 INSERT INTO ride_matching_settings (setting_type, settings_json) 
 VALUES ('detour_distance', JSON_OBJECT(
-    'default_detour_distance', 3.0,
+    'default_detour_distance', 20.0,
     'min_detour_distance', 0.5,
-    'max_detour_distance', 10.0,
-    'detour_increment', 0.5,
+    'max_detour_distance', 50.0,
+    'detour_increment', 5.0,
     'auto_detour_expansion', false,
     'expansion_time_limit', 300,
     'max_auto_expansions', 3

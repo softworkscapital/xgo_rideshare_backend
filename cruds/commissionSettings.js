@@ -74,12 +74,13 @@ crudsObj.isPromotionActive = () => {
         return resolve(false);
       }
 
-      const now = new Date();
+      const { getCurrentLocal } = require('../utils/timezone');
+      const now = getCurrentLocal();
       const promotionActive = settings.daily_promotion_active && 
                              settings.promotion_start_date && 
                              settings.promotion_end_date &&
-                             now >= new Date(settings.promotion_start_date) && 
-                             now <= new Date(settings.promotion_end_date);
+                             new Date(settings.promotion_start_date) <= now &&
+                             new Date(settings.promotion_end_date) >= now;
 
       resolve(promotionActive);
     } catch (error) {
@@ -91,7 +92,8 @@ crudsObj.isPromotionActive = () => {
 // Check if user already paid daily commission today
 crudsObj.checkDailyCommissionPaid = (userId) => {
   return new Promise((resolve, reject) => {
-    const today = new Date().toISOString().slice(0, 10);
+    const { getCurrentLocal } = require('../utils/timezone');
+    const today = getCurrentLocal().toISOString().slice(0, 10);
     
     pool.query(
       `SELECT * FROM top_up 
@@ -114,7 +116,8 @@ crudsObj.checkDailyCommissionPaid = (userId) => {
 // Record daily commission payment
 crudsObj.recordDailyCommission = (userId, commissionAmount, tripId = null) => {
   return new Promise((resolve, reject) => {
-    const description = `Daily flat rate commission - ${new Date().toISOString().slice(0, 10)}`;
+    const { getCurrentUTC, getCurrentLocal } = require('../utils/timezone');
+    const description = `Daily flat rate commission - ${getCurrentLocal().toISOString().slice(0, 10)}`;
     const trxn_code = `DAILY_COMM_${Date.now()}`;
     
     pool.query(
@@ -127,7 +130,7 @@ crudsObj.recordDailyCommission = (userId, commissionAmount, tripId = null) => {
         revenue_wallet_total_balance, folio
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
-        'USD', 1, new Date(), description, userId,
+        'USD', 1, getCurrentUTC(), description, userId,
         tripId, trxn_code, commissionAmount, 0, commissionAmount,
         0, 0, 0, 0, 0, 0,
         commissionAmount, 0, 0, 0, 'RW'
@@ -211,7 +214,8 @@ crudsObj.calculateCommission = async (userId, acceptedFare, userPreference = nul
 // Get driver earnings summary
 crudsObj.getDriverEarningsSummary = (userId, days = 7) => {
   return new Promise((resolve, reject) => {
-    const startDate = new Date();
+    const { getCurrentUTC } = require('../utils/timezone');
+    const startDate = getCurrentUTC();
     startDate.setDate(startDate.getDate() - days);
     
     // Get rideshare earnings

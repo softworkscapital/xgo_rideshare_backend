@@ -4,17 +4,25 @@ const commissionSettingsDb = require("../cruds/commissionSettings");
 
 // Get commission settings
 router.get("/settings", async (req, res) => {
+  console.log("Commission settings route called");
   try {
+    console.log("Fetching commission settings...");
     const settings = await commissionSettingsDb.getCommissionSettings();
-    const promotionActive = await commissionSettingsDb.isPromotionActive();
+    console.log("Settings fetched:", settings);
     
-    res.json({
+    console.log("Checking promotion status...");
+    const promotionActive = await commissionSettingsDb.isPromotionActive();
+    console.log("Promotion active:", promotionActive);
+    
+    const response = {
       status: 200,
       settings: {
         ...settings,
         promotion_active: promotionActive
       }
-    });
+    };
+    console.log("Sending response:", response);
+    res.json(response);
   } catch (error) {
     console.error("Error getting commission settings:", error);
     res.status(500).json({

@@ -24,10 +24,10 @@ router.get('/ride-matching/detour-settings', (req, res) => {
         }
         
         let settings = {
-            default_detour_distance: 3.0,
+            default_detour_distance: 20.0,
             min_detour_distance: 0.5,
-            max_detour_distance: 10.0,
-            detour_increment: 0.5,
+            max_detour_distance: 50.0,
+            detour_increment: 5.0,
             auto_detour_expansion: false,
             expansion_time_limit: 300,
             max_auto_expansions: 3
@@ -53,7 +53,7 @@ router.post('/ride-matching/detour-settings', (req, res) => {
     const validatedSettings = {
         default_detour_distance: Math.max(newSettings.min_detour_distance || 0.5, Math.min(newSettings.max_detour_distance || 10.0, newSettings.default_detour_distance || 3.0)),
         min_detour_distance: Math.max(0.1, Math.min(2, newSettings.min_detour_distance || 0.5)),
-        max_detour_distance: Math.max(5, Math.min(25, newSettings.max_detour_distance || 10.0)),
+        max_detour_distance: Math.max(5, Math.min(50, newSettings.max_detour_distance || 10.0)),
         detour_increment: Math.max(0.1, Math.min(2, newSettings.detour_increment || 0.5)),
         auto_detour_expansion: Boolean(newSettings.auto_detour_expansion || false),
         expansion_time_limit: Math.max(60, Math.min(1800, newSettings.expansion_time_limit || 300)),

@@ -32,6 +32,20 @@ const notificationTemplates = {
     }
   },
 
+  // Batch notifications for multiple requests
+  rideshare_batch_nearby: {
+    title: "🚀 High Demand Area Alert!",
+    body: "{totalRequests} rideshare requests in {areaName}. Top destinations: {destinations}",
+    priority: "high",
+    data: {
+      type: "rideshare_batch_request",
+      action: "view_rideshare_requests",
+      totalRequests: "{totalRequests}",
+      areaName: "{areaName}",
+      destinations: "{destinations}"
+    }
+  },
+
   // Counter Offer Notifications
   counter_offer_received: {
     title: "💰 Counter Offer Received",

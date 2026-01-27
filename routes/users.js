@@ -191,6 +191,17 @@ userRouter.get("/getdriverfulldetails/:driver_id", async (req, res) => {
 
   try {
     const userDetails = await usersDbOperations.getDriverInfo(driver_id); // Pass driver_id to getUsers
+    console.log(`[GET /getdriverfulldetails/${driver_id}] Returning data:`, {
+      driver_id: userDetails?.driver_id,
+      name: userDetails?.name,
+      surname: userDetails?.surname,
+      rating: userDetails?.rating,
+      make: userDetails?.make,
+      model: userDetails?.model,
+      colour: userDetails?.colour,
+      profilePic: userDetails?.profilePic ? 'EXISTS' : 'NULL',
+      profilePicLength: userDetails?.profilePic?.length
+    });
     res.json(userDetails);
   } catch (error) {
     console.error("Error fetching driver details:", error);

@@ -232,15 +232,9 @@ crudsObj.getDriverInfo = (driver_id) => {
   return new Promise((resolve, reject) => {
     const query = `
       SELECT 
-          u.*,  -- Select all columns from users
-          d.*,  -- Select all columns from driver_details
-          v.*   -- Select all columns from vehicles
+          d.*   -- Select all columns from driver_details (includes vehicle fields: make, model, colour, rating)
       FROM 
-          users u
-      LEFT JOIN 
-          driver_details d ON u.driver_id = d.driver_id
-      LEFT JOIN 
-          vehicles v ON d.driver_id = v.driver_id
+          driver_details d
       WHERE 
           d.driver_id = ?;
     `;
