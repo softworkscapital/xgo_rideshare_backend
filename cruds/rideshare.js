@@ -212,6 +212,8 @@ crudsObj.createRequest = (requestData) =>
       pickup_lng,
       dropoff_lat,
       dropoff_lng,
+      pickup_name,
+      dropoff_name,
       fare_offer,
       offer_amount,
       detour_distance,
@@ -238,8 +240,8 @@ crudsObj.createRequest = (requestData) =>
     pool.query(
       `INSERT INTO rideshare_requests (
         rideshare_id, passenger_id, pickup_lat, pickup_lng, dropoff_lat, dropoff_lng,
-        offer_amount, fare_offer, detour_distance, detour_time, status
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        pickup_name, dropoff_name, offer_amount, fare_offer, detour_distance, detour_time, status
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         rideshare_id,
         passenger_id,
@@ -247,6 +249,8 @@ crudsObj.createRequest = (requestData) =>
         pickup_lng,
         dropoff_lat,
         dropoff_lng,
+        pickup_name || null,
+        dropoff_name || null,
         finalOfferAmount,
         finalOfferAmount, // Store in both fields for backwards compatibility
         finalDetour.detour_distance,
